@@ -59,14 +59,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             DispatchMessage(&msg);
         }
 
-        gGraphicsPtr->DrawFrame();
-    }
-
-    if (gGraphicsPtr != NULL)
-    {
-        delete gGraphicsPtr;
-        gGraphicsPtr = NULL;
-    }    
+        if (gGraphicsPtr != NULL)
+        {
+            gGraphicsPtr->DrawFrame();
+        }
+    }  
 
     return (int) msg.wParam;
 }
@@ -170,6 +167,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         break;
     case WM_DESTROY:
+        if (gGraphicsPtr != NULL)
+        {
+            delete gGraphicsPtr;
+            gGraphicsPtr = NULL;
+        }
+
         PostQuitMessage(0);
         break;
     case WM_SIZE:

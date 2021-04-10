@@ -140,6 +140,12 @@ void VulkanGraphics::DrawFrame()
 	presentInfo.pResults = NULL;
 	result = vkQueuePresentKHR(m_ResourceDevice.GetGraphicsQueue(), &presentInfo);
 
+	if (result == VK_ERROR_OUT_OF_DATE_KHR)
+	{
+		Invalidate();
+		return;
+	}
+
 	if (result)
 	{
 		printf_console("[VulkanGraphics] failed to present a queue with error code %d\n", result);
