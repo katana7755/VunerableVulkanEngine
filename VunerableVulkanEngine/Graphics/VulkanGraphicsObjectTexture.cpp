@@ -29,7 +29,8 @@ bool VulkanGraphicsObjectTexture::CreateInternal()
 	if (result)
 	{
 		printf_console("[VulkanGraphics] failed to create a texture while creating VkImage with error code %d\n", result);
-		return false;
+
+		throw;
 	}
 
 	auto requirements = VkMemoryRequirements();
@@ -42,7 +43,8 @@ bool VulkanGraphicsObjectTexture::CreateInternal()
 	if (!VulkanGraphicsResourceDevice::GetMemoryTypeIndex(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &allocationInfo.memoryTypeIndex))
 	{
 		printf_console("[VulkanGraphics] cannot find memoryTypeIndex matching VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT\n");
-		return false;
+		
+		throw;
 	}
 
 	// TODO: find out which one is better between one big memory and seperate small allocation...
@@ -52,19 +54,18 @@ bool VulkanGraphicsObjectTexture::CreateInternal()
 	if (result)
 	{
 		printf_console("[VulkanGraphics] failed to create a texture while allocating VkDeviceMemory with error code %d\n", result);
-		return false;
+		
+		throw;
 	}
 
-	m_IsDeviceMemoryAllocated = true;
 	result = vkBindImageMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_Image, m_DeviceMemory, 0);
 
 	if (result)
 	{
 		printf_console("[VulkanGraphics] failed to create a texture while binding VkDeviceMemory to VkImage with error code %d\n", result);
-		return false;
-	}
 
-	m_IsDeviceMemoryBound = true;
+		throw;
+	}
 
 	auto imageViewCreateInfo = VkImageViewCreateInfo();
 	imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -87,32 +88,18 @@ bool VulkanGraphicsObjectTexture::CreateInternal()
 	if (result)
 	{
 		printf_console("[VulkanGraphics] failed to create a texture while creating VkImageView with error code %d\n", result);
-		return false;
+		
+		throw;
 	}
 
-	m_IsImageViewCreated = true;
 	return true;
 }
 
 bool VulkanGraphicsObjectTexture::DestroyInternal()
 {
-	if (m_IsImageViewCreated)
-	{
-		vkDestroyImageView(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_ImageView, NULL);
-		m_IsImageViewCreated = false;
-	}
-
-	if (m_IsDeviceMemoryBound)
-	{
-		m_IsDeviceMemoryBound = false;
-	}
-
-	if (m_IsDeviceMemoryAllocated)
-	{
-		vkFreeMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_DeviceMemory, NULL);
-		m_IsDeviceMemoryAllocated = false;
-	}
-
+	vkDestroyImageView(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_ImageView, NULL);
+	vkFreeMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_DeviceMemory, NULL);
 	vkDestroyImage(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_Image, NULL);
+
 	return true;
 }
