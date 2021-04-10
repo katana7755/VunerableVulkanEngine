@@ -8,6 +8,7 @@
 #include "VulkanGraphicsResourceCommandBufferManager.h"
 #include "VulkanGraphicsResourceRenderPassManager.h"
 #include "VulkanGraphicsResourcePipelineManager.h"
+#include "VulkanGraphicsObjectMesh.h"
 #include "VulkanGraphicsObjectTexture.h"
 #include "VulkanGraphicsObjectUniformBuffer.h"
 
@@ -35,6 +36,7 @@ private:
 	VulkanGraphicsResourceRenderPassManager m_ResourceRenderPassMgr;
 	VulkanGraphicsResourcePipelineManager m_ResourcePipelineMgr;
 
+	VulkanGraphicsObjectMesh m_StaticMesh;
 	VulkanGraphicsObjectTexture m_DepthTexture;
 	VulkanGraphicsObjectUniformBuffer m_MVPMatrixUniformBuffer;
 

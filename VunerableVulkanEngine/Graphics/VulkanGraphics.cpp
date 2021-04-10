@@ -17,6 +17,7 @@ VulkanGraphics::~VulkanGraphics()
 	//DestroyDescriptorSet();
 	m_MVPMatrixUniformBuffer.Destroy();
 	m_DepthTexture.Destroy();
+	m_StaticMesh.Destroy();
 
 	m_ResourcePipelineMgr.Destroy();
 	m_ResourceRenderPassMgr.Destroy();
@@ -38,6 +39,8 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 	m_ResourceRenderPassMgr.Create();
 	m_ResourcePipelineMgr.Create();
 
+	m_StaticMesh.PrepareDataFromFBX("../FBXs/free_male_1.FBX");
+	m_StaticMesh.Create();
 	m_DepthTexture.Create();
 	m_MVPMatrixUniformBuffer.Create();
 
@@ -67,6 +70,8 @@ void VulkanGraphics::Invalidate()
 	m_ResourceRenderPassMgr.Create();
 	m_ResourcePipelineMgr.Create();
 
+	m_StaticMesh.PrepareDataFromFBX("../FBXs/free_male_1.FBX");
+	m_StaticMesh.Create();
 	m_DepthTexture.Create();
 	m_MVPMatrixUniformBuffer.Create();
 
