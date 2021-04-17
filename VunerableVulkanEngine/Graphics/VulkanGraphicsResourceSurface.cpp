@@ -21,6 +21,7 @@ bool VulkanGraphicsResourceSurface::CreateInternal()
 	VkWin32SurfaceCreateInfoKHR createInfo;
 	createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
 	createInfo.pNext = NULL;
+	createInfo.flags = 0;
 	createInfo.hinstance = s_HInstance;
 	createInfo.hwnd = s_HWnd;
 	result = vkCreateWin32SurfaceKHR(VulkanGraphicsResourceInstance::GetInstance(), &createInfo, NULL, &s_Surface);

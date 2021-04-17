@@ -1,28 +1,23 @@
 #version 450
 
-vec2 positions[3] = vec2[] (
-	vec2(0.0, -0.5),
-	vec2(0.5, 0.5),
-	vec2(-0.5, 0.5)
-);
-
-vec3 worldNormals[3] = vec3[] (
-	vec3(0.0, 0.0, 1.0),
-	vec3(0.0, 0.0, 1.0),
-	vec3(0.0, 0.0, 1.0)
-);
+layout(location = 0) in vec3 Position;
+layout(location = 1) in vec2 UV;
+layout(location = 2) in vec3 Normal;
+layout(location = 3) in vec3 VertexColor;
 
 layout(push_constant) uniform PushConstantsType
 {
 	mat4x4 MVPMatrix;
-	mat4x3 ModelMatrix;
 	vec3 MainLightDirection;
 } PushConstants;
 
-layout(location = 0) out vec3 fragColor;
+layout(location = 0) out vec3 OutFragColor;
 
 void main()
 {
-	gl_Position = PushConstants.MVPMatrix * vec4(positions[gl_VertexIndex], 0.0, 1.0);
-	fragColor = dot(worldNormals[gl_VertexIndex], normalize(PushConstants.MainLightDirection)) * vec3(1.0, 1.0, 1.0);
+	gl_Position = PushConstants.MVPMatrix * vec4(Position, 1.0);
+
+	vec3 worldNormal = Normal; // ***** TODO: we need to convert this into world space normal, and for that TBN matrix is necessary...
+	//OutFragColor = dot(worldNormal, normalize(PushConstants.MainLightDirection)) * VertexColor;
+	OutFragColor = worldNormal;
 }

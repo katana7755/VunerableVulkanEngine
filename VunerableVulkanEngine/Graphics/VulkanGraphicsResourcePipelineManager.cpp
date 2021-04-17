@@ -136,6 +136,13 @@ int VulkanGraphicsResourcePipelineManager::CreateDescriptorSetLayout()
     std::vector<VkDescriptorSetLayoutBinding> descSetLayoutBindingArray;
     {
         // TODO: this is super important and needs to be implemented as soon as possible...(NECESSARY!!!)
+        //auto binding = VkDescriptorSetLayoutBinding();
+        //binding.binding = 0;
+        //binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        //binding.descriptorCount = 1;
+        //binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        //binding.pImmutableSamplers = NULL;
+        //descSetLayoutBindingArray.push_back(binding);
     }
 
     auto createInfo = VkDescriptorSetLayoutCreateInfo();
@@ -184,7 +191,7 @@ void VulkanGraphicsResourcePipelineManager::DestroyPushConstantRange(int index)
 
 int VulkanGraphicsResourcePipelineManager::CreatePipelineLayout(std::vector<int> desciptorSetLayoutIndexArray, std::vector<int> pushConstantRangeIndexArray)
 {
-    std::vector<VkDescriptorSetLayout> descriptorSetLayoutArray(desciptorSetLayoutIndexArray.size());
+    std::vector<VkDescriptorSetLayout> descriptorSetLayoutArray;
 
     for (auto index : desciptorSetLayoutIndexArray)
     {
@@ -270,33 +277,49 @@ int VulkanGraphicsResourcePipelineManager::CreateGraphicsPipeline(int vertexShad
     // TODO: need to support multiple vertex buffers...(NECESSARY!!!)
     static std::vector<VkVertexInputBindingDescription> vertexInputBindingDescArray;
     vertexInputBindingDescArray.clear();
-    //{
-    //    auto bindingDesc = VkVertexInputBindingDescription();
-    //    bindingDesc.binding = 0;
-    //    bindingDesc.stride = sizeof(VertexData);
-    //    bindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    //    vertexInputBindingDescArray.push_back(bindingDesc);
-    //}
+    {
+        auto bindingDesc = VkVertexInputBindingDescription();
+        bindingDesc.binding = 0;
+        bindingDesc.stride = sizeof(VertexData);
+        bindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        vertexInputBindingDescArray.push_back(bindingDesc);
+    }
 
     // TODO: need to support more various vertex channel like a vertex color...(NECESSARY!!!)
     static std::vector<VkVertexInputAttributeDescription> vertexInputAttributeDescArray;
     vertexInputAttributeDescArray.clear();
-    //{
-    //    auto attributeDesc = VkVertexInputAttributeDescription();
-    //    attributeDesc.location = 0;
-    //    attributeDesc.binding = 0;
-    //    attributeDesc.format = VK_FORMAT_R32G32B32_SFLOAT;
-    //    attributeDesc.offset = offsetof(VertexData, m_Position);
-    //    vertexInputAttributeDescArray.push_back(attributeDesc);
-    //}
-    //{
-    //    auto attributeDesc = VkVertexInputAttributeDescription();
-    //    attributeDesc.location = 0;
-    //    attributeDesc.binding = 0;
-    //    attributeDesc.format = VK_FORMAT_R32G32_SFLOAT;
-    //    attributeDesc.offset = offsetof(VertexData, m_UV);
-    //    vertexInputAttributeDescArray.push_back(attributeDesc);
-    //}
+    {
+        auto attributeDesc = VkVertexInputAttributeDescription();
+        attributeDesc.location = 0;
+        attributeDesc.binding = 0;
+        attributeDesc.format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDesc.offset = offsetof(VertexData, m_Position);
+        vertexInputAttributeDescArray.push_back(attributeDesc);
+    }
+    {
+        auto attributeDesc = VkVertexInputAttributeDescription();
+        attributeDesc.location = 1;
+        attributeDesc.binding = 0;
+        attributeDesc.format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDesc.offset = offsetof(VertexData, m_UV);
+        vertexInputAttributeDescArray.push_back(attributeDesc);
+    }
+    {
+        auto attributeDesc = VkVertexInputAttributeDescription();
+        attributeDesc.location = 2;
+        attributeDesc.binding = 0;
+        attributeDesc.format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDesc.offset = offsetof(VertexData, m_Normal);
+        vertexInputAttributeDescArray.push_back(attributeDesc);
+    }
+    {
+        auto attributeDesc = VkVertexInputAttributeDescription();
+        attributeDesc.location = 3;
+        attributeDesc.binding = 0;
+        attributeDesc.format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDesc.offset = offsetof(VertexData, m_Color);
+        vertexInputAttributeDescArray.push_back(attributeDesc);
+    }
 
     static auto vertexInputStateCreateInfo = VkPipelineVertexInputStateCreateInfo();
     vertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;

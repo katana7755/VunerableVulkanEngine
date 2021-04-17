@@ -63,6 +63,7 @@ void VulkanGraphics::Invalidate()
 {
 	m_MVPMatrixUniformBuffer.Destroy();
 	m_DepthTexture.Destroy();
+	m_StaticMesh.Destroy();
 
 	m_ResourcePipelineMgr.Destroy();
 	m_ResourceRenderPassMgr.Destroy();
@@ -261,22 +262,19 @@ void VulkanGraphics::BuildRenderLoop()
 
 	std::vector<int> descSetLayoutArray;
 	{
-		// TODO: implement the functionality of descriptor set layout in the future...(NECESSARY!!!)
+		//descSetLayoutArray.push_back(m_ResourcePipelineMgr.CreateDescriptorSetLayout());
 	}
 	
-	glm::mat4x4 modelMatrix = glm::mat4x4(1.0f); // identity matrix...
-	glm::mat4x4 viewMatrix = glm::lookAt(glm::vec3(3.0f, 2.0f, -5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0));
-	glm::mat4x4 pushProjectionMatrix = glm::perspective(glm::radians(60.0f), (float)height / width, 0.01f, 10.0f);
+	// TODO: when we have proper scene setting flow, remove this codes and replace with that...
+	glm::mat4x4 modelMatrix = glm::rotate(glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f)), glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	glm::mat4x4 viewMatrix = glm::lookAt(glm::vec3(0.0f, 0.0f, -120.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::mat4x4 pushProjectionMatrix = glm::perspective(glm::radians(60.0f), (float)width / height, 0.01f, 1000.0f);
 	glm::mat4x4 pushMVPMatrix = pushProjectionMatrix * viewMatrix * modelMatrix;
-	glm::mat4x3 pushModelMatrix = glm::mat4x3(modelMatrix);
 	glm::vec3 mainLightDirection = glm::vec3(0.0f, 0.0f, 1.0f);
 
 	std::vector<int> pushConstantRangeArray;
 	{
-		// TODO: implement the functionality of push constant range in the future...(NECESSARY!!!)
-		pushConstantRangeArray.push_back(m_ResourcePipelineMgr.CreatePushConstantRange(VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, sizeof(pushMVPMatrix)));
-		pushConstantRangeArray.push_back(m_ResourcePipelineMgr.CreatePushConstantRange(VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, sizeof(pushMVPMatrix), sizeof(modelMatrix)));
-		pushConstantRangeArray.push_back(m_ResourcePipelineMgr.CreatePushConstantRange(VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, sizeof(pushMVPMatrix) + sizeof(modelMatrix), sizeof(mainLightDirection)));
+		pushConstantRangeArray.push_back(m_ResourcePipelineMgr.CreatePushConstantRange(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushMVPMatrix) + sizeof(mainLightDirection)));
 	}	
 
 	int vertexShaderModuleIndex = m_ResourcePipelineMgr.CreateShaderModule("../Shaders/Output/coloredtriangle_vert.spv");
@@ -335,10 +333,11 @@ void VulkanGraphics::BuildRenderLoop()
 		renderPassBegin.pClearValues = clearValueArray.data();
 		vkCmdBeginRenderPass(commandBuffer, &renderPassBegin, VK_SUBPASS_CONTENTS_INLINE);
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, sizeof(pushMVPMatrix), &pushMVPMatrix);
-		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, sizeof(pushMVPMatrix), sizeof(modelMatrix), &modelMatrix);
-		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, sizeof(pushMVPMatrix) + sizeof(modelMatrix), sizeof(mainLightDirection), &mainLightDirection);
-		vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushMVPMatrix), &pushMVPMatrix);
+		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, sizeof(pushMVPMatrix), sizeof(mainLightDirection), &mainLightDirection);
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &m_StaticMesh.GetVertexBuffer(), new VkDeviceSize[]{ 0 }); // TODO: one day consider to bind multiple vertex buffers simultaneously...
+		vkCmdBindIndexBuffer(commandBuffer, m_StaticMesh.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+		vkCmdDrawIndexed(commandBuffer, m_StaticMesh.GetIndexCount(), 1, 0, 0, 0);
 		vkCmdEndRenderPass(commandBuffer);
 		result = vkEndCommandBuffer(commandBuffer);
 
