@@ -222,6 +222,11 @@ int VulkanGraphicsResourcePipelineManager::CreatePipelineLayout(std::vector<int>
     return s_PipelineLayoutArray.size() - 1;
 }
 
+const VkPipelineLayout& VulkanGraphicsResourcePipelineManager::GetPipelineLayout(int index)
+{
+    return s_PipelineLayoutArray[index];
+}
+
 void VulkanGraphicsResourcePipelineManager::DestroyPipelineLayout(int index)
 {
     vkDestroyPipelineLayout(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_PipelineLayoutArray[index], NULL);
@@ -353,7 +358,7 @@ int VulkanGraphicsResourcePipelineManager::CreateGraphicsPipeline(int vertexShad
     rasterizationState.rasterizerDiscardEnable = VK_FALSE; // TODO: this seems to be used when there is no Geometry Shader and Tessellation...
     rasterizationState.polygonMode = VK_POLYGON_MODE_FILL; // TODO: there are additional modes, one of these is drawing in wire frame mode...
     rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizationState.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterizationState.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizationState.depthBiasEnable = VK_FALSE; // TODO: this will be used in shadow and decal rendering
     rasterizationState.depthBiasConstantFactor = 0.0f;
     rasterizationState.depthBiasClamp = 0.0f;

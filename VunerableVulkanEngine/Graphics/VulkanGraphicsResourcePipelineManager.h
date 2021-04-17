@@ -20,6 +20,7 @@ public:
 	static int CreatePushConstantRange(VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size);
 	static void DestroyPushConstantRange(int index);
 	static int CreatePipelineLayout(std::vector<int> desciptorSetLayoutIndexArray, std::vector<int> pushConstantRangeIndexArray);
+	static const VkPipelineLayout& GetPipelineLayout(int index);
 	static void DestroyPipelineLayout(int index);
 	static void BeginToCreateGraphicsPipeline();
 	static int CreateGraphicsPipeline(int vertexShaderModuleIndex, int fragmentShaderModuleIndex, int pipelineLayoutIndex, int renderPassIndex, int subPassIndex);

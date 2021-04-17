@@ -119,7 +119,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;FBXSDK_SHARED;_WINDOWS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>./External/Include;./External/Include/fbx_sdk;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./External/Include;./External/Include/fbx_sdk;./Utils</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -130,6 +130,15 @@
     <PostBuildEvent>
       <Command>copy "External\Library\fbx_sdk\x64\debug\libfbxsdk.dll" $(OutDir)</Command>
     </PostBuildEvent>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+      <Message>Compiling shaders...</Message>
+    </PreBuildEvent>
+    <CustomBuildStep>
+      <Command>..\Tools\shader_compiler\glslc.exe ..\Shaders\Input\coloredtriangle.vert -o ..\Shaders\Output\coloredtriangle_vert.spv</Command>
+      <Outputs>just_for_triggering</Outputs>
+    </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -139,7 +148,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;FBXSDK_SHARED;_WINDOWS;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>./External/Include;./External/Include/fbx_sdk;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./External/Include;./External/Include/fbx_sdk;./Utils</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -152,6 +161,15 @@
     <PostBuildEvent>
       <Command>copy "External\Library\fbx_sdk\x64\release\libfbxsdk.dll" $(OutDir)</Command>
     </PostBuildEvent>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+      <Message>Compiling shaders...</Message>
+    </PreBuildEvent>
+    <CustomBuildStep>
+      <Command>..\Tools\shader_compiler\glslc.exe ..\Shaders\Input\coloredtriangle.vert -o ..\Shaders\Output\coloredtriangle_vert.spv</Command>
+      <Outputs>just_for_triggering</Outputs>
+    </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Graphics\VulkanGraphics.h" />

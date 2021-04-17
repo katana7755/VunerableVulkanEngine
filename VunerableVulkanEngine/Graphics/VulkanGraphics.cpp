@@ -1,8 +1,11 @@
+#define GLM_FORCE_RADIANS
+
 #include <Windows.h>
 #include <stdio.h>
 #include "VulkanGraphics.h"
 #include "vulkan/vulkan_win32.h" // TODO: need to consider other platfroms such as Android, Linux etc... in the future
 #include "../DebugUtility.h"
+#include "glm/gtc/matrix_transform.hpp"
 
 const int MAX_COMMAND_BUFFER_COUNT = 1;
 
@@ -14,7 +17,7 @@ VulkanGraphics::VulkanGraphics()
 VulkanGraphics::~VulkanGraphics()
 {
 	vkDeviceWaitIdle(VulkanGraphicsResourceDevice::GetLogicalDevice());
-	//DestroyDescriptorSet();
+
 	m_MVPMatrixUniformBuffer.Destroy();
 	m_DepthTexture.Destroy();
 	m_StaticMesh.Destroy();
@@ -87,12 +90,11 @@ void VulkanGraphics::DrawFrame()
 	auto acquireNextImageSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_AcquireNextImageSemaphoreIndex);
 	auto queueSubmitFence = m_ResourcePipelineMgr.GetGfxFence(m_QueueSubmitFenceIndex);
 	auto queueSubmitSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_QueueSubmitSemaphoreIndex);
-
 	vkWaitForFences(m_ResourceDevice.GetLogicalDevice(), 1, &queueSubmitFence, VK_TRUE, UINT64_MAX);
 	vkResetFences(m_ResourceDevice.GetLogicalDevice(), 1, &queueSubmitFence);
 	VulkanGraphicsResourceSwapchain::AcquireNextImage(acquireNextImageSemaphore, VK_NULL_HANDLE);
 
-	auto imageIndex = VulkanGraphicsResourceSwapchain::GetAcquireedImageIndex();
+	auto imageIndex = VulkanGraphicsResourceSwapchain::GetAcquiredImageIndex();
 
 	std::vector<VkSemaphore> waitSemaphoreArray;
 	{
@@ -262,9 +264,19 @@ void VulkanGraphics::BuildRenderLoop()
 		// TODO: implement the functionality of descriptor set layout in the future...(NECESSARY!!!)
 	}
 	
+	glm::mat4x4 modelMatrix = glm::mat4x4(1.0f); // identity matrix...
+	glm::mat4x4 viewMatrix = glm::lookAt(glm::vec3(3.0f, 2.0f, -5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0));
+	glm::mat4x4 pushProjectionMatrix = glm::perspective(glm::radians(60.0f), (float)height / width, 0.01f, 10.0f);
+	glm::mat4x4 pushMVPMatrix = pushProjectionMatrix * viewMatrix * modelMatrix;
+	glm::mat4x3 pushModelMatrix = glm::mat4x3(modelMatrix);
+	glm::vec3 mainLightDirection = glm::vec3(0.0f, 0.0f, 1.0f);
+
 	std::vector<int> pushConstantRangeArray;
 	{
 		// TODO: implement the functionality of push constant range in the future...(NECESSARY!!!)
+		pushConstantRangeArray.push_back(m_ResourcePipelineMgr.CreatePushConstantRange(VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, sizeof(pushMVPMatrix)));
+		pushConstantRangeArray.push_back(m_ResourcePipelineMgr.CreatePushConstantRange(VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, sizeof(pushMVPMatrix), sizeof(modelMatrix)));
+		pushConstantRangeArray.push_back(m_ResourcePipelineMgr.CreatePushConstantRange(VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, sizeof(pushMVPMatrix) + sizeof(modelMatrix), sizeof(mainLightDirection)));
 	}	
 
 	int vertexShaderModuleIndex = m_ResourcePipelineMgr.CreateShaderModule("../Shaders/Output/coloredtriangle_vert.spv");
@@ -311,6 +323,8 @@ void VulkanGraphics::BuildRenderLoop()
 		//	clearValueArray.push_back(clearValue);
 		//}
 
+		auto pipelineLayout = m_ResourcePipelineMgr.GetPipelineLayout(pipelineLayoutIndex);
+		auto pipeline = m_ResourcePipelineMgr.GetGraphicsPipeline(pipelineIndex);
 		auto renderPassBegin = VkRenderPassBeginInfo();
 		renderPassBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		renderPassBegin.pNext = NULL;
@@ -320,7 +334,10 @@ void VulkanGraphics::BuildRenderLoop()
 		renderPassBegin.clearValueCount = clearValueArray.size();
 		renderPassBegin.pClearValues = clearValueArray.data();
 		vkCmdBeginRenderPass(commandBuffer, &renderPassBegin, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_ResourcePipelineMgr.GetGraphicsPipeline(pipelineIndex));
+		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, sizeof(pushMVPMatrix), &pushMVPMatrix);
+		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, sizeof(pushMVPMatrix), sizeof(modelMatrix), &modelMatrix);
+		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, sizeof(pushMVPMatrix) + sizeof(modelMatrix), sizeof(mainLightDirection), &mainLightDirection);
 		vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 		vkCmdEndRenderPass(commandBuffer);
 		result = vkEndCommandBuffer(commandBuffer);

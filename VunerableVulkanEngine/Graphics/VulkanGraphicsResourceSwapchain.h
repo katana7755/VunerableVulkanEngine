@@ -10,7 +10,7 @@ public:
 	static const VkImageView& GetImageView(int index);
 	static void AcquireNextImage(const VkSemaphore& waitSemaphore, const VkFence& waitFence);
 
-	static const uint32_t& GetAcquireedImageIndex()
+	static const uint32_t& GetAcquiredImageIndex()
 	{
 		return s_AcquiredImageIndex;
 	}

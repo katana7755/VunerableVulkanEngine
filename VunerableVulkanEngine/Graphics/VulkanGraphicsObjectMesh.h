@@ -5,6 +5,8 @@ struct VertexData
 {
 	glm::vec3 m_Position;
 	glm::vec2 m_UV;
+	glm::vec3 m_Normal;
+	glm::vec4 m_Color;
 };
 
 #pragma once
@@ -20,7 +22,8 @@ protected:
 	virtual bool DestroyInternal() override;
 
 private:
-	VkBuffer m_Buffer;
-	VkDeviceMemory m_DeviceMemory;
+	// This is for a vertex buffer, so we need to create one more buffer for index buffer...
+	VkBuffer m_GPUBuffer;
+	VkDeviceMemory m_GPUMemory;
 };
 
