@@ -261,10 +261,15 @@ void VulkanGraphics::BuildRenderLoop()
 	{
 		// TODO: implement the functionality of descriptor set layout in the future...(NECESSARY!!!)
 	}
+	
+	std::vector<int> pushConstantRangeArray;
+	{
+		// TODO: implement the functionality of push constant range in the future...(NECESSARY!!!)
+	}	
 
 	int vertexShaderModuleIndex = m_ResourcePipelineMgr.CreateShaderModule("../Shaders/Output/coloredtriangle_vert.spv");
 	int fragmentShaderModuleIndex = m_ResourcePipelineMgr.CreateShaderModule("../Shaders/Output/coloredtriangle_frag.spv");
-	int pipelineLayoutIndex = m_ResourcePipelineMgr.CreatePipelineLayout(descSetLayoutArray);
+	int pipelineLayoutIndex = m_ResourcePipelineMgr.CreatePipelineLayout(descSetLayoutArray, pushConstantRangeArray);
 	m_ResourcePipelineMgr.BeginToCreateGraphicsPipeline();
 
 	int pipelineIndex = m_ResourcePipelineMgr.CreateGraphicsPipeline(vertexShaderModuleIndex, fragmentShaderModuleIndex, pipelineLayoutIndex, renderPassIndex, 0);

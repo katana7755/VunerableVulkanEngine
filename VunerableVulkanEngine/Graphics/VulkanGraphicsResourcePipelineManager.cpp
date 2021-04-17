@@ -12,6 +12,7 @@ VkPipelineCache VulkanGraphicsResourcePipelineManager::s_PipelineCache;
 std::vector<VkFence> VulkanGraphicsResourcePipelineManager::s_GfxFenceArray;
 std::vector<VkSemaphore> VulkanGraphicsResourcePipelineManager::s_GfxSemaphoreArray;
 std::vector<VkDescriptorSetLayout> VulkanGraphicsResourcePipelineManager::s_DescriptorSetLayoutArray;
+std::vector<VkPushConstantRange> VulkanGraphicsResourcePipelineManager::s_PushConstantRangeArray;
 std::vector<VkPipelineLayout> VulkanGraphicsResourcePipelineManager::s_PipelineLayoutArray;
 std::vector<VkShaderModule> VulkanGraphicsResourcePipelineManager::s_ShaderModuleArray;
 std::vector<VkGraphicsPipelineCreateInfo> VulkanGraphicsResourcePipelineManager::s_GraphicsPipelineCreateInfoArray;
@@ -120,6 +121,7 @@ int VulkanGraphicsResourcePipelineManager::CreateShaderModule(const char* strFil
     }
 
     s_ShaderModuleArray.push_back(shaderModule);
+
     return s_ShaderModuleArray.size() - 1;
 }
 
@@ -154,6 +156,8 @@ int VulkanGraphicsResourcePipelineManager::CreateDescriptorSetLayout()
     }
 
     s_DescriptorSetLayoutArray.push_back(descSetLayout);
+
+    return s_DescriptorSetLayoutArray.size() - 1;
 }
 
 void VulkanGraphicsResourcePipelineManager::DestroyDescriptorSetLayout(int index)
@@ -162,7 +166,23 @@ void VulkanGraphicsResourcePipelineManager::DestroyDescriptorSetLayout(int index
     s_DescriptorSetLayoutArray.erase(s_DescriptorSetLayoutArray.begin() + index);
 }
 
-int VulkanGraphicsResourcePipelineManager::CreatePipelineLayout(std::vector<int> desciptorSetLayoutIndexArray)
+int VulkanGraphicsResourcePipelineManager::CreatePushConstantRange(VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size)
+{
+    auto pushConstantRange = VkPushConstantRange();
+    pushConstantRange.stageFlags = stageFlags;
+    pushConstantRange.offset = offset;
+    pushConstantRange.size = size;
+    s_PushConstantRangeArray.push_back(pushConstantRange);
+
+    return s_PushConstantRangeArray.size() - 1;
+}
+
+void VulkanGraphicsResourcePipelineManager::DestroyPushConstantRange(int index)
+{
+    s_PushConstantRangeArray.erase(s_PushConstantRangeArray.begin() + index);
+}
+
+int VulkanGraphicsResourcePipelineManager::CreatePipelineLayout(std::vector<int> desciptorSetLayoutIndexArray, std::vector<int> pushConstantRangeIndexArray)
 {
     std::vector<VkDescriptorSetLayout> descriptorSetLayoutArray(desciptorSetLayoutIndexArray.size());
 
@@ -171,9 +191,11 @@ int VulkanGraphicsResourcePipelineManager::CreatePipelineLayout(std::vector<int>
         descriptorSetLayoutArray.push_back(s_DescriptorSetLayoutArray[index]);
     }
 
-    // TODO: push constants which has limited size as big as 128 bytes but is faster and more convinient than Uniform Buffer Object...(NECESSARY!!!)
     std::vector<VkPushConstantRange> pushConstantRangeArray;
+    
+    for (auto index : pushConstantRangeIndexArray)
     {
+        pushConstantRangeArray.push_back(s_PushConstantRangeArray[index]);
     }
 
     auto createInfo = VkPipelineLayoutCreateInfo();
@@ -609,6 +631,7 @@ bool VulkanGraphicsResourcePipelineManager::DestroyInternal()
     }
 
     s_DescriptorSetLayoutArray.clear();
+    s_PushConstantRangeArray.clear();
 
     for (auto semaphore : s_GfxSemaphoreArray)
     {

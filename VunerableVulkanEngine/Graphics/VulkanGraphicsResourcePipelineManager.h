@@ -17,7 +17,9 @@ public:
 	static void DestroyShaderModule(int index);
 	static int CreateDescriptorSetLayout();
 	static void DestroyDescriptorSetLayout(int index);
-	static int CreatePipelineLayout(std::vector<int> desciptorSetLayoutIndexArray);
+	static int CreatePushConstantRange(VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size);
+	static void DestroyPushConstantRange(int index);
+	static int CreatePipelineLayout(std::vector<int> desciptorSetLayoutIndexArray, std::vector<int> pushConstantRangeIndexArray);
 	static void DestroyPipelineLayout(int index);
 	static void BeginToCreateGraphicsPipeline();
 	static int CreateGraphicsPipeline(int vertexShaderModuleIndex, int fragmentShaderModuleIndex, int pipelineLayoutIndex, int renderPassIndex, int subPassIndex);
@@ -31,6 +33,7 @@ private:
 	static std::vector<VkSemaphore> s_GfxSemaphoreArray;
 	static std::vector<VkShaderModule> s_ShaderModuleArray;
 	static std::vector<VkDescriptorSetLayout> s_DescriptorSetLayoutArray;
+	static std::vector<VkPushConstantRange> s_PushConstantRangeArray;
 	static std::vector<VkPipelineLayout> s_PipelineLayoutArray;
 	static std::vector<VkGraphicsPipelineCreateInfo> s_GraphicsPipelineCreateInfoArray;
 	static std::vector<VkPipeline> s_GraphicsPipelineArray;
