@@ -381,7 +381,7 @@ int VulkanGraphicsResourcePipelineManager::CreateGraphicsPipeline(int vertexShad
     rasterizationState.rasterizerDiscardEnable = VK_FALSE; // TODO: this seems to be used when there is no Geometry Shader and Tessellation...
     rasterizationState.polygonMode = VK_POLYGON_MODE_FILL; // TODO: there are additional modes, one of these is drawing in wire frame mode...
     rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizationState.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizationState.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterizationState.depthBiasEnable = VK_FALSE; // TODO: this will be used in shadow and decal rendering
     rasterizationState.depthBiasConstantFactor = 0.0f;
     rasterizationState.depthBiasClamp = 0.0f;
@@ -405,13 +405,13 @@ int VulkanGraphicsResourcePipelineManager::CreateGraphicsPipeline(int vertexShad
     depthStencilState.flags = 0;
     depthStencilState.depthTestEnable = VK_TRUE;
     depthStencilState.depthWriteEnable = VK_TRUE;
-    depthStencilState.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+    depthStencilState.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
     depthStencilState.depthBoundsTestEnable = VK_FALSE; // TODO: let's find out use-cases of this functionality
     depthStencilState.stencilTestEnable = VK_FALSE; // TODO: leave it until we need to use stencil test...
     depthStencilState.front = VkStencilOpState{}; 
     depthStencilState.back = VkStencilOpState{};
     depthStencilState.minDepthBounds = 0.0f;
-    depthStencilState.maxDepthBounds = 0.0f;
+    depthStencilState.maxDepthBounds = 1.0f;
 
     // TODO: we should seperate transparent from opaque. for now we consider all objects are oppaque. (NECESSARY!!!)
     static std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachmentStateArray;
@@ -467,7 +467,7 @@ int VulkanGraphicsResourcePipelineManager::CreateGraphicsPipeline(int vertexShad
     createInfo.pViewportState = &viewportState;
     createInfo.pRasterizationState = &rasterizationState;
     createInfo.pMultisampleState = &multisampleState;
-    createInfo.pDepthStencilState = NULL;// &depthStencilState;
+    createInfo.pDepthStencilState = &depthStencilState;
     createInfo.pColorBlendState = &colorBlendState;
     createInfo.pDynamicState = NULL; // &dynamicState;
     createInfo.layout = s_PipelineLayoutArray[pipelineLayoutIndex];

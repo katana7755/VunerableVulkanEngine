@@ -180,19 +180,19 @@ void VulkanGraphics::BuildRenderLoop()
 		desc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 		attachmentDescArray.push_back(desc);
 	}
-	//{
-	//	auto desc = VkAttachmentDescription();
-	//	desc.flags = 0;
-	//	desc.format = VK_FORMAT_D32_SFLOAT; // TODO: need to define depth format (NECESSARY!!!)
-	//	desc.samples = VK_SAMPLE_COUNT_1_BIT; // TODO: need to be modified when starting to consider msaa...(NECESSARY!!!)
-	//	desc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	//	desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	//	desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	//	desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	//	desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	//	desc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-	//	attachmentDescArray.push_back(desc);
-	//}
+	{
+		auto desc = VkAttachmentDescription();
+		desc.flags = 0;
+		desc.format = VK_FORMAT_D32_SFLOAT; // TODO: need to define depth format (NECESSARY!!!)
+		desc.samples = VK_SAMPLE_COUNT_1_BIT; // TODO: need to be modified when starting to consider msaa...(NECESSARY!!!)
+		desc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		desc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		attachmentDescArray.push_back(desc);
+	}
 
 	// TODO: think about optimizable use-cases of subpass...one can be postprocess...
 	std::vector<VkSubpassDescription> subPassDescArray;
@@ -214,8 +214,8 @@ void VulkanGraphics::BuildRenderLoop()
 			subPassColorAttachmentArray.push_back(ref);
 		}
 
-		//subPassDepthStencilAttachment.attachment = 1;
-		//subPassDepthStencilAttachment.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		subPassDepthStencilAttachment.attachment = 1;
+		subPassDepthStencilAttachment.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		
 		// subPassPreserveAttachmentArray
 		{
@@ -230,7 +230,7 @@ void VulkanGraphics::BuildRenderLoop()
 		desc.colorAttachmentCount = subPassColorAttachmentArray.size();
 		desc.pColorAttachments = subPassColorAttachmentArray.data();
 		desc.pResolveAttachments = NULL; // TODO: msaa...(NECESSARY!!!)
-		desc.pDepthStencilAttachment = NULL; // &subPassDepthStencilAttachment;
+		desc.pDepthStencilAttachment = &subPassDepthStencilAttachment;
 		desc.preserveAttachmentCount = subPassPreserveAttachmentArray.size();
 		desc.pPreserveAttachments = subPassPreserveAttachmentArray.data();
 		subPassDescArray.push_back(desc);
@@ -257,7 +257,7 @@ void VulkanGraphics::BuildRenderLoop()
 
 	for (int i = 0; i < swapchainImageViewCount; ++i)
 	{
-		m_ResourceRenderPassMgr.CreateFramebuffer(renderPassIndex, { m_ResourceSwapchain.GetImageView(i)/*, m_DepthTexture.GetImageView()*/ }, width, height, 1);
+		m_ResourceRenderPassMgr.CreateFramebuffer(renderPassIndex, { m_ResourceSwapchain.GetImageView(i), m_DepthTexture.GetImageView() }, width, height, 1);
 	}
 
 	std::vector<int> descSetLayoutArray;
@@ -267,7 +267,7 @@ void VulkanGraphics::BuildRenderLoop()
 	
 	// TODO: when we have proper scene setting flow, remove this codes and replace with that...
 	glm::mat4x4 modelMatrix = glm::rotate(glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f)), glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	glm::mat4x4 viewMatrix = glm::lookAt(glm::vec3(0.0f, 0.0f, -120.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::mat4x4 viewMatrix = glm::lookAt(glm::vec3(0.0f, 0.0f, 120.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	glm::mat4x4 pushProjectionMatrix = glm::perspective(glm::radians(60.0f), (float)width / height, 0.01f, 1000.0f);
 	glm::mat4x4 pushMVPMatrix = pushProjectionMatrix * viewMatrix * modelMatrix;
 	glm::vec3 mainLightDirection = glm::vec3(0.0f, 0.0f, 1.0f);
@@ -313,13 +313,13 @@ void VulkanGraphics::BuildRenderLoop()
 			clearValue.depthStencil.stencil = 0;
 			clearValueArray.push_back(clearValue);
 		}
-		//{
-		//	auto clearValue = VkClearValue();
-		//	clearValue.color = { 0.0f, 0.0f, 0.0f, 0.0f };
-		//	clearValue.depthStencil.depth = 0.0f;
-		//	clearValue.depthStencil.stencil = 0;
-		//	clearValueArray.push_back(clearValue);
-		//}
+		{
+			auto clearValue = VkClearValue();
+			clearValue.color = { 0.0f, 0.0f, 0.0f, 0.0f };
+			clearValue.depthStencil.depth = 1.0f;
+			clearValue.depthStencil.stencil = 0;
+			clearValueArray.push_back(clearValue);
+		}
 
 		auto pipelineLayout = m_ResourcePipelineMgr.GetPipelineLayout(pipelineLayoutIndex);
 		auto pipeline = m_ResourcePipelineMgr.GetGraphicsPipeline(pipelineIndex);
