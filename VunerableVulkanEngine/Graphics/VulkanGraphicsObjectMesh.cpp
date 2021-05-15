@@ -14,6 +14,13 @@ void SetNormalAttribute(std::vector<VertexData>& vertexDataArray, int vertexInde
 	vertexDataArray[vertexIndex] = vertexData;
 }
 
+void SetUVAttribute(std::vector<VertexData>& vertexDataArray, int vertexIndex, FbxVector2 val)
+{
+	auto vertexData = vertexDataArray[vertexIndex];
+	vertexData.m_UV += glm::vec2(val[0], val[1]);;
+	vertexDataArray[vertexIndex] = vertexData;
+}
+
 template <class TFbxLayerElementType, class TValue>
 struct VertexAttributeUtil
 {
@@ -189,6 +196,7 @@ void VulkanGraphicsObjectMesh::PrepareDataFromFBX(const char* strFbxPath)
 			auto controlPointArray = mesh->GetControlPoints();
 			vertexDataArray.resize(controlPointCount);
 			vertexNormalCountArray.resize(controlPointCount, 0);
+			vertexUVCountArray.resize(controlPointCount, 0);
 
 			for (int i = 0; i < controlPointCount; ++i)
 			{
@@ -204,10 +212,8 @@ void VulkanGraphicsObjectMesh::PrepareDataFromFBX(const char* strFbxPath)
 			int polygonCount = mesh->GetPolygonCount();
 			int polygonIndex = 0;
 			auto layerPtr = (mesh->GetLayerCount() > 0) ? mesh->GetLayer(0) : NULL; // TODO: need to research on what the purpose multiple layers are...
-			auto elementPtr = (layerPtr != NULL) ? layerPtr->GetNormals() : NULL;
-			auto directArray = (elementPtr != NULL) ? &elementPtr->GetDirectArray() : NULL;
-			auto indirectArray = (elementPtr != NULL) ? &elementPtr->GetIndexArray() : NULL;	
-
+			auto elementNormalPtr = (layerPtr != NULL) ? layerPtr->GetNormals() : NULL;
+			auto elementUVPtr = (layerPtr != NULL) ? layerPtr->GetUVs() : NULL;
 			int vertexIndices[3];
 
 			for (int i = 0; i < polygonCount; ++i)
@@ -216,96 +222,15 @@ void VulkanGraphicsObjectMesh::PrepareDataFromFBX(const char* strFbxPath)
 
 				if (indexSize == 3)
 				{
-					int index0 = mesh->GetPolygonVertex(i, 0);
-					int index1 = mesh->GetPolygonVertex(i, 1);
-					int index2 = mesh->GetPolygonVertex(i, 2);
-					int vertexIndex0 = index0;
-					int vertexIndex1 = index1;
-					int vertexIndex2 = index2;
-					indexDataArray.push_back(vertexIndex0);
-					indexDataArray.push_back(vertexIndex1);
-					indexDataArray.push_back(vertexIndex2);
-
-					vertexIndices[0] = index0;
-					vertexIndices[1] = index1;
-					vertexIndices[2] = index2;
-
-					if (elementPtr != NULL && directArray->GetCount() > 0)
-					{
-						VertexAttributeUtil<FbxLayerElementNormal, FbxVector4>::HandleWhenTriangle(elementPtr, vertexDataArray, &SetNormalAttribute, vertexIndices, polygonIndex, vertexNormalCountArray);
-
-						//switch (elementPtr->GetMappingMode())
-						//{
-						//	case FbxGeometryElement::eByControlPoint:
-						//		break;
-
-						//	case FbxGeometryElement::eByPolygonVertex:
-						//		index0 = polygonIndex + 0;
-						//		index1 = polygonIndex + 1;
-						//		index2 = polygonIndex + 2;
-						//		break;
-
-						//	default:
-						//		printf_console("!!!! - -1\n");
-						//		throw;
-						//}
-
-						//switch (elementPtr->GetReferenceMode())
-						//{
-						//	case FbxGeometryElement::eDirect:
-						//	{
-						//		auto vertexData = vertexDataArray[vertexIndex0];
-						//		auto vector = directArray->GetAt(index0);
-						//		vertexData.m_Normal += glm::vec3(vector[0], vector[1], vector[2]);
-						//		vertexDataArray[vertexIndex0] = vertexData;
-						//		++vertexNormalCountArray[vertexIndex0];
-
-						//		vertexData = vertexDataArray[vertexIndex1];
-						//		vector = directArray->GetAt(index1);
-						//		vertexData.m_Normal += glm::vec3(vector[0], vector[1], vector[2]);
-						//		vertexDataArray[vertexIndex1] = vertexData;
-						//		++vertexNormalCountArray[vertexIndex1];
-
-						//		vertexData = vertexDataArray[vertexIndex2];
-						//		vector = directArray->GetAt(index2);
-						//		vertexData.m_Normal += glm::vec3(vector[0], vector[1], vector[2]);
-						//		vertexDataArray[vertexIndex2] = vertexData;
-						//		++vertexNormalCountArray[vertexIndex2];
-						//	}
-						//	break;
-
-						//	case FbxGeometryElement::eIndexToDirect:
-						//	{
-						//		int id = indirectArray->GetAt(index0);
-						//		auto vertexData = vertexDataArray[vertexIndex0];
-						//		auto vector = directArray->GetAt(id);
-						//		vertexData.m_Normal += glm::vec3(vector[0], vector[1], vector[2]);
-						//		vertexDataArray[vertexIndex0] = vertexData;
-						//		++vertexNormalCountArray[vertexIndex0];
-
-						//		id = indirectArray->GetAt(index1);
-						//		vertexData = vertexDataArray[vertexIndex1];
-						//		vector = directArray->GetAt(id);
-						//		vertexData.m_Normal += glm::vec3(vector[0], vector[1], vector[2]);
-						//		vertexDataArray[vertexIndex1] = vertexData;
-						//		++vertexNormalCountArray[vertexIndex1];
-
-						//		id = indirectArray->GetAt(index2);
-						//		vertexData = vertexDataArray[vertexIndex2];
-						//		vector = directArray->GetAt(id);
-						//		vertexData.m_Normal += glm::vec3(vector[0], vector[1], vector[2]);
-						//		vertexDataArray[vertexIndex2] = vertexData;
-						//		++vertexNormalCountArray[vertexIndex2];
-						//	}
-						//	break;
-
-						//	default:
-						//		printf_console("!!!! - -2\n");
-						//		throw;
-						//}
-
-						polygonIndex += 3;
-					}
+					vertexIndices[0] = mesh->GetPolygonVertex(i, 0);
+					vertexIndices[1] = mesh->GetPolygonVertex(i, 1);
+					vertexIndices[2] = mesh->GetPolygonVertex(i, 2);
+					indexDataArray.push_back(vertexIndices[0]);
+					indexDataArray.push_back(vertexIndices[1]);
+					indexDataArray.push_back(vertexIndices[2]);
+					VertexAttributeUtil<FbxLayerElementNormal, FbxVector4>::HandleWhenTriangle(elementNormalPtr, vertexDataArray, &SetNormalAttribute, vertexIndices, polygonIndex, vertexNormalCountArray);
+					VertexAttributeUtil<FbxLayerElementUV, FbxVector2>::HandleWhenTriangle(elementUVPtr, vertexDataArray, &SetUVAttribute, vertexIndices, polygonIndex, vertexUVCountArray);
+					polygonIndex += 3;
 				}
 				else
 				{
@@ -319,8 +244,8 @@ void VulkanGraphicsObjectMesh::PrepareDataFromFBX(const char* strFbxPath)
 			for (int i = 0; i < controlPointCount; ++i)
 			{
 				auto vertexData = vertexDataArray[i];
-				int vertexNormalCount = vertexNormalCountArray[i];
-				vertexData.m_Normal = (vertexNormalCount > 1) ? vertexData.m_Normal / (float)vertexNormalCount : vertexData.m_Normal;
+				vertexData.m_Normal = (vertexNormalCountArray[i] > 1) ? vertexData.m_Normal / (float)vertexNormalCountArray[i] : vertexData.m_Normal;
+				vertexData.m_UV = (vertexUVCountArray[i] > 1) ? vertexData.m_UV / (float)vertexUVCountArray[i] : vertexData.m_UV;
 				vertexDataArray[i] = vertexData;
 			}
 
