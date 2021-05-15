@@ -7,6 +7,76 @@
 FbxManager* gFBXManagerPtr = NULL;
 FbxScene* gFBXScenePtr = NULL;
 
+void SetNormalAttribute(std::vector<VertexData>& vertexDataArray, int vertexIndex, FbxVector4 val)
+{
+	auto vertexData = vertexDataArray[vertexIndex];
+	vertexData.m_Normal += glm::vec3(val[0], val[1], val[2]);;
+	vertexDataArray[vertexIndex] = vertexData;
+}
+
+template <class TFbxLayerElementType, class TValue>
+struct VertexAttributeUtil
+{
+	typedef void (*FuncSetter)(std::vector<VertexData>& vertexDataArray, int vertexIndex, TValue val);
+
+	static void HandleWhenTriangle(const TFbxLayerElementType* elementPtr, std::vector<VertexData>& vertexDataArray, FuncSetter funcSetter, int vertexIndices[3], int polygonIndex, std::vector<int>& attributeCountArray)
+	{
+		auto directArray = (elementPtr != NULL) ? &elementPtr->GetDirectArray() : NULL;
+		auto indirectArray = (elementPtr != NULL) ? &elementPtr->GetIndexArray() : NULL;
+
+		if (directArray == NULL || directArray->GetCount() <= 0)
+		{
+			return;
+		}
+
+		int indirectIndices[3] = { vertexIndices[0], vertexIndices[1], vertexIndices[2] };
+
+		switch (elementPtr->GetMappingMode())
+		{
+		case FbxGeometryElement::eByControlPoint:
+			break;
+
+		case FbxGeometryElement::eByPolygonVertex:
+			indirectIndices[0] = polygonIndex + 0;
+			indirectIndices[1] = polygonIndex + 1;
+			indirectIndices[2] = polygonIndex + 2;
+			break;
+
+		default:
+			printf_console("!!!! - -1\n");
+			throw;
+		}
+
+		switch (elementPtr->GetReferenceMode())
+		{
+		case FbxGeometryElement::eDirect:
+		{
+			for (int i = 0; i < 3; ++i)
+			{
+				(*funcSetter)(vertexDataArray, vertexIndices[i], directArray->GetAt(indirectIndices[i]));
+				++attributeCountArray[vertexIndices[i]];
+			}
+		}
+		break;
+
+		case FbxGeometryElement::eIndexToDirect:
+		{
+			for (int i = 0; i < 3; ++i)
+			{
+				int id = indirectArray->GetAt(indirectIndices[i]);
+				(*funcSetter)(vertexDataArray, vertexIndices[i], directArray->GetAt(id));
+				++attributeCountArray[vertexIndices[i]];
+			}
+		}
+		break;
+
+		default:
+			printf_console("!!!! - -2\n");
+			throw;
+		}
+	}
+};
+
 void VulkanGraphicsObjectMesh::PrepareDataFromFBX(const char* strFbxPath)
 {
 	if (gFBXManagerPtr == NULL)
@@ -78,9 +148,13 @@ void VulkanGraphicsObjectMesh::PrepareDataFromFBX(const char* strFbxPath)
 	}
 
 	// TODO: currently, for the first version we simply handle only one mesh, but in the future let's handle multiple meshes too...
-	// TODO: there might be more information in a FBX file that those need to be parsed such as texture, skeleton, animation, blend shape, etc...
+	// TODO: there might be more information in a FBX file that those need to be parsed such as 
+	//       - texture
+	//       - skeleton animation
+	//       - blend shape animation
 	auto vertexDataArray = std::vector<VertexData>();
 	auto vertexNormalCountArray = std::vector<int>();
+	auto vertexUVCountArray = std::vector<int>();
 	auto indexDataArray = std::vector<int>();
 	auto nodeQueue = std::queue<FbxNode*>();
 	nodeQueue.push(gFBXScenePtr->GetRootNode());
@@ -129,10 +203,12 @@ void VulkanGraphicsObjectMesh::PrepareDataFromFBX(const char* strFbxPath)
 
 			int polygonCount = mesh->GetPolygonCount();
 			int polygonIndex = 0;
-			auto layerPtr = (mesh->GetLayerCount() > 0) ? mesh->GetLayer(0) : NULL;
+			auto layerPtr = (mesh->GetLayerCount() > 0) ? mesh->GetLayer(0) : NULL; // TODO: need to research on what the purpose multiple layers are...
 			auto elementPtr = (layerPtr != NULL) ? layerPtr->GetNormals() : NULL;
 			auto directArray = (elementPtr != NULL) ? &elementPtr->GetDirectArray() : NULL;
-			auto indirectArray = (elementPtr != NULL) ? &elementPtr->GetIndexArray() : NULL;			
+			auto indirectArray = (elementPtr != NULL) ? &elementPtr->GetIndexArray() : NULL;	
+
+			int vertexIndices[3];
 
 			for (int i = 0; i < polygonCount; ++i)
 			{
@@ -150,77 +226,83 @@ void VulkanGraphicsObjectMesh::PrepareDataFromFBX(const char* strFbxPath)
 					indexDataArray.push_back(vertexIndex1);
 					indexDataArray.push_back(vertexIndex2);
 
+					vertexIndices[0] = index0;
+					vertexIndices[1] = index1;
+					vertexIndices[2] = index2;
+
 					if (elementPtr != NULL && directArray->GetCount() > 0)
 					{
-						switch (elementPtr->GetMappingMode())
-						{
-							case FbxGeometryElement::eByControlPoint:
-								break;
+						VertexAttributeUtil<FbxLayerElementNormal, FbxVector4>::HandleWhenTriangle(elementPtr, vertexDataArray, &SetNormalAttribute, vertexIndices, polygonIndex, vertexNormalCountArray);
 
-							case FbxGeometryElement::eByPolygonVertex:
-								index0 = polygonIndex + 0;
-								index1 = polygonIndex + 1;
-								index2 = polygonIndex + 2;
-								break;
+						//switch (elementPtr->GetMappingMode())
+						//{
+						//	case FbxGeometryElement::eByControlPoint:
+						//		break;
 
-							default:
-								printf_console("!!!! - -1\n");
-								throw;
-						}
+						//	case FbxGeometryElement::eByPolygonVertex:
+						//		index0 = polygonIndex + 0;
+						//		index1 = polygonIndex + 1;
+						//		index2 = polygonIndex + 2;
+						//		break;
 
-						switch (elementPtr->GetReferenceMode())
-						{
-							case FbxGeometryElement::eDirect:
-							{
-								auto vertexData = vertexDataArray[vertexIndex0];
-								auto vector = directArray->GetAt(index0);
-								vertexData.m_Normal += glm::vec3(vector[0], vector[1], vector[2]);
-								vertexDataArray[vertexIndex0] = vertexData;
-								++vertexNormalCountArray[vertexIndex0];
+						//	default:
+						//		printf_console("!!!! - -1\n");
+						//		throw;
+						//}
 
-								vertexData = vertexDataArray[vertexIndex1];
-								vector = directArray->GetAt(index1);
-								vertexData.m_Normal += glm::vec3(vector[0], vector[1], vector[2]);
-								vertexDataArray[vertexIndex1] = vertexData;
-								++vertexNormalCountArray[vertexIndex1];
+						//switch (elementPtr->GetReferenceMode())
+						//{
+						//	case FbxGeometryElement::eDirect:
+						//	{
+						//		auto vertexData = vertexDataArray[vertexIndex0];
+						//		auto vector = directArray->GetAt(index0);
+						//		vertexData.m_Normal += glm::vec3(vector[0], vector[1], vector[2]);
+						//		vertexDataArray[vertexIndex0] = vertexData;
+						//		++vertexNormalCountArray[vertexIndex0];
 
-								vertexData = vertexDataArray[vertexIndex2];
-								vector = directArray->GetAt(index2);
-								vertexData.m_Normal += glm::vec3(vector[0], vector[1], vector[2]);
-								vertexDataArray[vertexIndex2] = vertexData;
-								++vertexNormalCountArray[vertexIndex2];
-							}
-							break;
+						//		vertexData = vertexDataArray[vertexIndex1];
+						//		vector = directArray->GetAt(index1);
+						//		vertexData.m_Normal += glm::vec3(vector[0], vector[1], vector[2]);
+						//		vertexDataArray[vertexIndex1] = vertexData;
+						//		++vertexNormalCountArray[vertexIndex1];
 
-							case FbxGeometryElement::eIndexToDirect:
-							{
-								int id = indirectArray->GetAt(index0);
-								auto vertexData = vertexDataArray[vertexIndex0];
-								auto vector = directArray->GetAt(id);
-								vertexData.m_Normal += glm::vec3(vector[0], vector[1], vector[2]);
-								vertexDataArray[vertexIndex0] = vertexData;
-								++vertexNormalCountArray[vertexIndex0];
+						//		vertexData = vertexDataArray[vertexIndex2];
+						//		vector = directArray->GetAt(index2);
+						//		vertexData.m_Normal += glm::vec3(vector[0], vector[1], vector[2]);
+						//		vertexDataArray[vertexIndex2] = vertexData;
+						//		++vertexNormalCountArray[vertexIndex2];
+						//	}
+						//	break;
 
-								id = indirectArray->GetAt(index1);
-								vertexData = vertexDataArray[vertexIndex1];
-								vector = directArray->GetAt(id);
-								vertexData.m_Normal += glm::vec3(vector[0], vector[1], vector[2]);
-								vertexDataArray[vertexIndex1] = vertexData;
-								++vertexNormalCountArray[vertexIndex1];
+						//	case FbxGeometryElement::eIndexToDirect:
+						//	{
+						//		int id = indirectArray->GetAt(index0);
+						//		auto vertexData = vertexDataArray[vertexIndex0];
+						//		auto vector = directArray->GetAt(id);
+						//		vertexData.m_Normal += glm::vec3(vector[0], vector[1], vector[2]);
+						//		vertexDataArray[vertexIndex0] = vertexData;
+						//		++vertexNormalCountArray[vertexIndex0];
 
-								id = indirectArray->GetAt(index2);
-								vertexData = vertexDataArray[vertexIndex2];
-								vector = directArray->GetAt(id);
-								vertexData.m_Normal += glm::vec3(vector[0], vector[1], vector[2]);
-								vertexDataArray[vertexIndex2] = vertexData;
-								++vertexNormalCountArray[vertexIndex2];
-							}
-							break;
+						//		id = indirectArray->GetAt(index1);
+						//		vertexData = vertexDataArray[vertexIndex1];
+						//		vector = directArray->GetAt(id);
+						//		vertexData.m_Normal += glm::vec3(vector[0], vector[1], vector[2]);
+						//		vertexDataArray[vertexIndex1] = vertexData;
+						//		++vertexNormalCountArray[vertexIndex1];
 
-							default:
-								printf_console("!!!! - -2\n");
-								throw;
-						}
+						//		id = indirectArray->GetAt(index2);
+						//		vertexData = vertexDataArray[vertexIndex2];
+						//		vector = directArray->GetAt(id);
+						//		vertexData.m_Normal += glm::vec3(vector[0], vector[1], vector[2]);
+						//		vertexDataArray[vertexIndex2] = vertexData;
+						//		++vertexNormalCountArray[vertexIndex2];
+						//	}
+						//	break;
+
+						//	default:
+						//		printf_console("!!!! - -2\n");
+						//		throw;
+						//}
 
 						polygonIndex += 3;
 					}
@@ -228,7 +310,7 @@ void VulkanGraphicsObjectMesh::PrepareDataFromFBX(const char* strFbxPath)
 				else
 				{
 					printf_console("!!!! - 0\n");
-					// TODO: handle not only quad but also any type of polygons...
+					// TODO: handle not only triangle but also any type of polygons...
 
 					throw;
 				}
@@ -238,7 +320,7 @@ void VulkanGraphicsObjectMesh::PrepareDataFromFBX(const char* strFbxPath)
 			{
 				auto vertexData = vertexDataArray[i];
 				int vertexNormalCount = vertexNormalCountArray[i];
-				vertexData.m_Normal = (vertexNormalCount > 0) ? vertexData.m_Normal / (float)vertexNormalCount : vertexData.m_Normal;
+				vertexData.m_Normal = (vertexNormalCount > 1) ? vertexData.m_Normal / (float)vertexNormalCount : vertexData.m_Normal;
 				vertexDataArray[i] = vertexData;
 			}
 
