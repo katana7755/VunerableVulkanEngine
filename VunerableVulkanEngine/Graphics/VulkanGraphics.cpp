@@ -20,7 +20,8 @@ VulkanGraphics::~VulkanGraphics()
 
 	m_MVPMatrixUniformBuffer.Destroy();
 	m_DepthTexture.Destroy();
-	m_StaticMesh.Destroy();
+	m_CharacterBodyTexture.Destroy();
+	m_CharacterMesh.Destroy();
 
 	m_ResourcePipelineMgr.Destroy();
 	m_ResourceRenderPassMgr.Destroy();
@@ -42,9 +43,9 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 	m_ResourceRenderPassMgr.Create();
 	m_ResourcePipelineMgr.Create();
 
-	m_StaticMesh.PrepareDataFromFBX("../FBXs/free_male_1.FBX");
-	m_StaticMesh.Create();
-	m_DepthTexture.Create();
+	m_CharacterMesh.CreateFromFBX("../FBXs/free_male_1.FBX");
+	m_CharacterBodyTexture.CreateAsTexture("../PNGs/free_male_1_body_diffuse.png");
+	m_DepthTexture.CreateAsDepthBuffer();
 	m_MVPMatrixUniformBuffer.Create();
 
 	m_AcquireNextImageSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
@@ -63,7 +64,8 @@ void VulkanGraphics::Invalidate()
 {
 	m_MVPMatrixUniformBuffer.Destroy();
 	m_DepthTexture.Destroy();
-	m_StaticMesh.Destroy();
+	m_CharacterBodyTexture.Destroy();
+	m_CharacterMesh.Destroy();
 
 	m_ResourcePipelineMgr.Destroy();
 	m_ResourceRenderPassMgr.Destroy();
@@ -74,9 +76,9 @@ void VulkanGraphics::Invalidate()
 	m_ResourceRenderPassMgr.Create();
 	m_ResourcePipelineMgr.Create();
 
-	m_StaticMesh.PrepareDataFromFBX("../FBXs/free_male_1.FBX");
-	m_StaticMesh.Create();
-	m_DepthTexture.Create();
+	m_CharacterMesh.CreateFromFBX("../FBXs/free_male_1.FBX");
+	m_CharacterBodyTexture.CreateAsTexture("../PNGs/free_male_1_body_diffuse.png");
+	m_DepthTexture.CreateAsDepthBuffer();
 	m_MVPMatrixUniformBuffer.Create();
 
 	m_AcquireNextImageSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
@@ -86,8 +88,79 @@ void VulkanGraphics::Invalidate()
 	BuildRenderLoop();
 }
 
+void VulkanGraphics::TransferAllStagingBuffers()
+{
+	if (!m_CharacterBodyTexture.IsStagingBufferExist())
+	{
+		return;
+	}
+
+	auto commandBuffer = m_ResourceCommandBufferMgr.AllocateAdditionalCommandBuffer();
+	auto commandBufferArray = m_ResourceCommandBufferMgr.GetAllAdditionalCommandBuffers();
+
+	auto beginInfo = VkCommandBufferBeginInfo();
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.pNext = NULL;
+	beginInfo.flags = NULL;
+	beginInfo.pInheritanceInfo = NULL; // TODO: use this when building a secondary command buffer...(NECESSARY!!!)
+
+	auto result = vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+	if (result)
+	{
+		printf_console("[VulkanGraphics] failed to begin a command buffer with error code %d\n", result);
+
+		throw;
+	}
+
+	m_CharacterBodyTexture.ApplyStagingBuffer(commandBuffer);
+
+	result = vkEndCommandBuffer(commandBuffer);
+
+	if (result)
+	{
+		printf_console("[VulkanGraphics] failed to record a command buffer with error code %d\n", result);
+
+		throw;
+	}
+
+	auto submitInfo = VkSubmitInfo();
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.pNext = NULL;
+	submitInfo.waitSemaphoreCount = 0;
+	submitInfo.pWaitSemaphores = NULL;
+	submitInfo.pWaitDstStageMask = NULL;
+	submitInfo.commandBufferCount = commandBufferArray.size(); // TODO: in the future think about submitting multiple queues simultaneously...
+	submitInfo.pCommandBuffers = commandBufferArray.data();
+	submitInfo.signalSemaphoreCount = 0;
+	submitInfo.pSignalSemaphores = NULL;
+
+	result = vkQueueSubmit(m_ResourceDevice.GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+
+	if (result)
+	{
+		printf_console("[VulkanGraphics] failed to submit a queue with error code %d\n", result);
+
+		throw;
+	}
+
+	result = vkQueueWaitIdle(m_ResourceDevice.GetGraphicsQueue());
+
+	if (result)
+	{
+		printf_console("[VulkanGraphics] failed to wait a queue with error code %d\n", result);
+
+		throw;
+	}
+
+	m_ResourceCommandBufferMgr.ClearAdditionalCommandBuffer();
+	m_CharacterBodyTexture.ClearStagingBuffer();
+}
+
 void VulkanGraphics::DrawFrame()
 {
+	TransferAllStagingBuffers();
+
 	auto acquireNextImageSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_AcquireNextImageSemaphoreIndex);
 	auto queueSubmitFence = m_ResourcePipelineMgr.GetGfxFence(m_QueueSubmitFenceIndex);
 	auto queueSubmitSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_QueueSubmitSemaphoreIndex);
@@ -295,7 +368,7 @@ void VulkanGraphics::BuildRenderLoop()
 
 	for (int i = 0; i < count; ++i)
 	{
-		auto commandBuffer = VulkanGraphicsResourceCommandBufferManager::GetPrimaryCommandBuffer(i);
+		auto commandBuffer = m_ResourceCommandBufferMgr.GetPrimaryCommandBuffer(i);
 		auto result = vkBeginCommandBuffer(commandBuffer, &beginInfo);
 
 		if (result)
@@ -335,9 +408,9 @@ void VulkanGraphics::BuildRenderLoop()
 		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushMVPMatrix), &pushMVPMatrix);
 		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, sizeof(pushMVPMatrix), sizeof(mainLightDirection), &mainLightDirection);
-		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &m_StaticMesh.GetVertexBuffer(), new VkDeviceSize[]{ 0 }); // TODO: one day consider to bind multiple vertex buffers simultaneously...
-		vkCmdBindIndexBuffer(commandBuffer, m_StaticMesh.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
-		vkCmdDrawIndexed(commandBuffer, m_StaticMesh.GetIndexCount(), 1, 0, 0, 0);
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &m_CharacterMesh.GetVertexBuffer(), new VkDeviceSize[]{ 0 }); // TODO: one day consider to bind multiple vertex buffers simultaneously...
+		vkCmdBindIndexBuffer(commandBuffer, m_CharacterMesh.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+		vkCmdDrawIndexed(commandBuffer, m_CharacterMesh.GetIndexCount(), 1, 0, 0, 0);
 		vkCmdEndRenderPass(commandBuffer);
 		result = vkEndCommandBuffer(commandBuffer);
 

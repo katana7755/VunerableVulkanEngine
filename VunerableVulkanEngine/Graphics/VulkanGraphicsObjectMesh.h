@@ -15,10 +15,13 @@ struct VertexData
 class VulkanGraphicsObjectMesh : public VulkanGraphicsObjectBase
 {
 public:
-	void PrepareDataFromFBX(const char* strFbxPath);
+	void CreateFromFBX(const char* strFbxPath);
 	const VkBuffer& GetVertexBuffer() { return m_GPUVertexBuffer; };
 	const VkBuffer& GetIndexBuffer() { return m_GPUIndexBuffer; };
 	uint32_t GetIndexCount() { return m_IndexCount; };
+
+private:
+	void Create() {}; // Hide the base create function
 
 protected:
 	virtual bool CreateInternal() override;

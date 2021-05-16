@@ -84,7 +84,7 @@ struct VertexAttributeUtil
 	}
 };
 
-void VulkanGraphicsObjectMesh::PrepareDataFromFBX(const char* strFbxPath)
+void VulkanGraphicsObjectMesh::CreateFromFBX(const char* strFbxPath)
 {
 	if (gFBXManagerPtr == NULL)
 	{
@@ -263,8 +263,8 @@ void VulkanGraphicsObjectMesh::PrepareDataFromFBX(const char* strFbxPath)
 	CreateGPUResource(m_GPUVertexBuffer, m_GPUVertexMemory, vertexDataArray.data(), vertexDataArray.size() * sizeof(VertexData), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	CreateGPUResource(m_GPUIndexBuffer, m_GPUIndexMemory, indexDataArray.data(), indexDataArray.size() * sizeof(int), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	m_IndexCount = indexDataArray.size();
-
 	importer->Destroy();
+	VulkanGraphicsObjectBase::Create();
 }
 
 bool VulkanGraphicsObjectMesh::CreateInternal()

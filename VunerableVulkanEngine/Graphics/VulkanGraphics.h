@@ -23,6 +23,7 @@ public:
 #endif
 
 	void Invalidate();
+	void TransferAllStagingBuffers();
 	void DrawFrame();
 
 private:
@@ -36,7 +37,8 @@ private:
 	VulkanGraphicsResourceRenderPassManager m_ResourceRenderPassMgr;
 	VulkanGraphicsResourcePipelineManager m_ResourcePipelineMgr;
 
-	VulkanGraphicsObjectMesh m_StaticMesh;
+	VulkanGraphicsObjectMesh m_CharacterMesh;
+	VulkanGraphicsObjectTexture m_CharacterBodyTexture;
 	VulkanGraphicsObjectTexture m_DepthTexture;
 	VulkanGraphicsObjectUniformBuffer m_MVPMatrixUniformBuffer;
 
