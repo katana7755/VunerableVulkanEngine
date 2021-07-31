@@ -17,6 +17,9 @@ std::vector<VkPipelineLayout> VulkanGraphicsResourcePipelineManager::s_PipelineL
 std::vector<VkShaderModule> VulkanGraphicsResourcePipelineManager::s_ShaderModuleArray;
 std::vector<VkGraphicsPipelineCreateInfo> VulkanGraphicsResourcePipelineManager::s_GraphicsPipelineCreateInfoArray;
 std::vector<VkPipeline> VulkanGraphicsResourcePipelineManager::s_GraphicsPipelineArray;
+std::vector<VkDescriptorPool> VulkanGraphicsResourcePipelineManager::s_DescriptorPoolArray;
+std::vector<int> VulkanGraphicsResourcePipelineManager::s_DescriptorPoolIndexArray;
+std::vector<VkDescriptorSet> VulkanGraphicsResourcePipelineManager::s_DescriptorSetArray;
 
 int VulkanGraphicsResourcePipelineManager::CreateGfxFence()
 {
@@ -131,18 +134,18 @@ void VulkanGraphicsResourcePipelineManager::DestroyShaderModule(int index)
     s_ShaderModuleArray.erase(s_ShaderModuleArray.begin() + index);
 }
 
+// TODO: we need to make this feasible to support variable cases...
 int VulkanGraphicsResourcePipelineManager::CreateDescriptorSetLayout()
 {
     std::vector<VkDescriptorSetLayoutBinding> descSetLayoutBindingArray;
     {
-        // TODO: this is super important and needs to be implemented as soon as possible...(NECESSARY!!!)
-        //auto binding = VkDescriptorSetLayoutBinding();
-        //binding.binding = 0;
-        //binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        //binding.descriptorCount = 1;
-        //binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-        //binding.pImmutableSamplers = NULL;
-        //descSetLayoutBindingArray.push_back(binding);
+        auto binding = VkDescriptorSetLayoutBinding();
+        binding.binding = 0;
+        binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        binding.descriptorCount = 1;
+        binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        binding.pImmutableSamplers = NULL;
+        descSetLayoutBindingArray.push_back(binding);
     }
 
     auto createInfo = VkDescriptorSetLayoutCreateInfo();
@@ -508,6 +511,110 @@ void VulkanGraphicsResourcePipelineManager::DestroyGraphicsPipeline(int index)
     s_GraphicsPipelineArray.erase(s_GraphicsPipelineArray.begin() + index);
 }
 
+// TODO: we will implement the function in which we can create any descriptor freely
+int VulkanGraphicsResourcePipelineManager::CreateDescriptorPool()
+{
+    auto poolSizeArray = std::vector<VkDescriptorPoolSize>();
+    {
+        auto poolSize = VkDescriptorPoolSize();
+        poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSize.descriptorCount = 1;
+        poolSizeArray.push_back(poolSize);
+    }
+
+    auto createInfo = VkDescriptorPoolCreateInfo();
+    createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    createInfo.pNext = NULL;
+    createInfo.flags = 0;
+    createInfo.maxSets = 1;
+    createInfo.poolSizeCount = poolSizeArray.size();
+    createInfo.pPoolSizes = poolSizeArray.data();
+
+    auto descriptorPool = VkDescriptorPool();
+    auto result = vkCreateDescriptorPool(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &descriptorPool);
+
+    if (result)
+    {
+        printf_console("[VulkanGraphics] failed to create a descriptor pool with error code %d\n", result);
+
+        throw;
+    }
+
+    s_DescriptorPoolArray.push_back(descriptorPool);
+
+    return s_DescriptorPoolArray.size() - 1;
+}
+
+void VulkanGraphicsResourcePipelineManager::DestroyDescriptorPool(int index)
+{
+    vkDestroyDescriptorPool(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_DescriptorPoolArray[index], NULL);
+    s_DescriptorPoolArray.erase(s_DescriptorPoolArray.begin() + index);
+}
+
+// TODO: we will implement the function in which we can create any descriptor freely
+int VulkanGraphicsResourcePipelineManager::AllocateDescriptorSet(int poolIndex, int layoutIndex)
+{
+    auto allocateInfo = VkDescriptorSetAllocateInfo();
+    allocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocateInfo.pNext = NULL;
+    allocateInfo.descriptorPool = s_DescriptorPoolArray[poolIndex];
+    allocateInfo.descriptorSetCount = 1;
+    allocateInfo.pSetLayouts = &s_DescriptorSetLayoutArray[layoutIndex];
+
+    auto descriptorSet = VkDescriptorSet();
+    auto result = vkAllocateDescriptorSets(VulkanGraphicsResourceDevice::GetLogicalDevice(), &allocateInfo, &descriptorSet);
+
+    if (result)
+    {
+        printf_console("[VulkanGraphics] failed to allocate a descriptor set with error code %d\n", result);
+
+        throw;
+    }
+
+    s_DescriptorSetArray.push_back(descriptorSet);
+
+    return s_DescriptorSetArray.size() - 1;
+}
+
+void VulkanGraphicsResourcePipelineManager::UpdateDescriptorSet(int index, const VkImageView& imageView, const VkSampler& sampler)
+{
+    std::vector<VkWriteDescriptorSet> writeSetArray;
+    {
+        auto imageInfo = VkDescriptorImageInfo();
+        imageInfo.sampler = sampler;
+        imageInfo.imageView = imageView;
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        auto writeSet = VkWriteDescriptorSet();
+        writeSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writeSet.pNext = NULL;
+        writeSet.dstSet = s_DescriptorSetArray[index];
+        writeSet.dstBinding = 0;
+        writeSet.dstArrayElement = 0;
+        writeSet.descriptorCount = 1;
+        writeSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writeSet.pImageInfo = &imageInfo;
+        writeSet.pBufferInfo = NULL;
+        writeSet.pTexelBufferView = NULL;
+        writeSetArray.push_back(writeSet);
+    }
+
+    vkUpdateDescriptorSets(VulkanGraphicsResourceDevice::GetLogicalDevice(), 1, writeSetArray.data(), 0, NULL);
+}
+
+void VulkanGraphicsResourcePipelineManager::ReleaseDescriptorSet(int index)
+{
+    int poolIndex = s_DescriptorPoolIndexArray[index];
+    vkFreeDescriptorSets(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_DescriptorPoolArray[poolIndex], 1, &s_DescriptorSetArray[index]);
+    s_DescriptorPoolIndexArray.erase(s_DescriptorPoolIndexArray.begin() + index);
+    s_DescriptorSetArray.erase(s_DescriptorSetArray.begin() + index);
+}
+
+const std::vector<VkDescriptorSet>& VulkanGraphicsResourcePipelineManager::GetDescriptorSetArray()
+{
+    return s_DescriptorSetArray;
+}
+
 bool VulkanGraphicsResourcePipelineManager::CreateInternal()
 {
 	std::vector<uint8_t> dataArray;
@@ -632,6 +739,17 @@ bool VulkanGraphicsResourcePipelineManager::DestroyInternal()
         fclose(file);
     }
 
+    // descriptor sets will be released when deleting descriptor pools
+    s_DescriptorPoolIndexArray.clear();
+    s_DescriptorSetArray.clear();
+
+    for (auto descPool : s_DescriptorPoolArray)
+    {
+        vkDestroyDescriptorPool(VulkanGraphicsResourceDevice::GetLogicalDevice(), descPool, NULL);
+    }
+
+    s_DescriptorPoolArray.clear();
+
     for (auto shaderModule : s_ShaderModuleArray)
     {
         vkDestroyShaderModule(VulkanGraphicsResourceDevice::GetLogicalDevice(), shaderModule, NULL);
@@ -646,19 +764,19 @@ bool VulkanGraphicsResourcePipelineManager::DestroyInternal()
 
     s_GraphicsPipelineArray.clear();
 
-    for (auto pipelineLayout : s_PipelineLayoutArray)
-    {
-        vkDestroyPipelineLayout(VulkanGraphicsResourceDevice::GetLogicalDevice(), pipelineLayout, NULL);
-    }
-
-    s_PipelineLayoutArray.clear();
-
     for (auto descSetLayout : s_DescriptorSetLayoutArray)
     {
         vkDestroyDescriptorSetLayout(VulkanGraphicsResourceDevice::GetLogicalDevice(), descSetLayout, NULL);
     }
 
     s_DescriptorSetLayoutArray.clear();
+
+    for (auto pipelineLayout : s_PipelineLayoutArray)
+    {
+        vkDestroyPipelineLayout(VulkanGraphicsResourceDevice::GetLogicalDevice(), pipelineLayout, NULL);
+    }
+
+    s_PipelineLayoutArray.clear();
     s_PushConstantRangeArray.clear();
 
     for (auto semaphore : s_GfxSemaphoreArray)

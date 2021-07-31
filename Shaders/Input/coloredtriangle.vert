@@ -11,13 +11,15 @@ layout(push_constant) uniform PushConstantsType
 	vec3 MainLightDirection;
 } PushConstants;
 
-layout(location = 0) out vec3 OutFragColor;
+layout(location = 0) out vec3 OutNormal;
+layout(location = 1) out vec2 OutUV;
 
 void main()
 {
 	gl_Position = PushConstants.MVPMatrix * vec4(Position, 1.0);
 
-	vec3 worldNormal = Normal; // ***** TODO: we need to convert this into world space normal, and for that TBN matrix is necessary...
+	//vec3 worldNormal = Normal; // ***** TODO: we need to convert this into world space normal, and for that TBN matrix is necessary...
 	//OutFragColor = dot(worldNormal, normalize(PushConstants.MainLightDirection)) * VertexColor;
-	OutFragColor = worldNormal;
+	OutNormal = Normal;
+	OutUV = UV;
 }

@@ -132,8 +132,8 @@
       <Command>copy "External\Library\fbx_sdk\x64\debug\libfbxsdk.dll" $(OutDir)</Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>
-      </Command>
+      <Command>glslc.exe ../Shaders/Input/coloredtriangle.vert -o ../Shaders/Output/coloredtriangle_vert.spv
+glslc.exe ../Shaders/Input/coloredtriangle.frag -o ../Shaders/Output/coloredtriangle_frag.spv</Command>
       <Message>Compiling shaders...</Message>
     </PreBuildEvent>
     <CustomBuildStep>
@@ -176,6 +176,7 @@
     <ClInclude Include="Graphics\VulkanGraphics.h" />
     <ClInclude Include="Graphics\VulkanGraphicsObjectBase.h" />
     <ClInclude Include="Graphics\VulkanGraphicsObjectMesh.h" />
+    <ClInclude Include="Graphics\VulkanGraphicsObjectSampler.h" />
     <ClInclude Include="Graphics\VulkanGraphicsObjectTexture.h" />
     <ClInclude Include="Graphics\VulkanGraphicsObjectUniformBuffer.h" />
     <ClInclude Include="Graphics\VulkanGraphicsResourceCommandBufferManager.h" />
@@ -195,6 +196,7 @@
     <ClCompile Include="Graphics\VulkanGraphics.cpp" />
     <ClCompile Include="Graphics\VulkanGraphicsObjectBase.cpp" />
     <ClCompile Include="Graphics\VulkanGraphicsObjectMesh.cpp" />
+    <ClCompile Include="Graphics\VulkanGraphicsObjectSampler.cpp" />
     <ClCompile Include="Graphics\VulkanGraphicsObjectTexture.cpp" />
     <ClCompile Include="Graphics\VulkanGraphicsObjectUniformBuffer.cpp" />
     <ClCompile Include="Graphics\VulkanGraphicsResourceBase.cpp" />

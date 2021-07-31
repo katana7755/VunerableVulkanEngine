@@ -11,6 +11,7 @@
 #include "VulkanGraphicsObjectMesh.h"
 #include "VulkanGraphicsObjectTexture.h"
 #include "VulkanGraphicsObjectUniformBuffer.h"
+#include "VulkanGraphicsObjectSampler.h"
 
 class VulkanGraphics
 {
@@ -39,6 +40,7 @@ private:
 
 	VulkanGraphicsObjectMesh m_CharacterMesh;
 	VulkanGraphicsObjectTexture m_CharacterBodyTexture;
+	VulkanGraphicsObjectSampler m_CharacterBodySampler;
 	VulkanGraphicsObjectTexture m_DepthTexture;
 	VulkanGraphicsObjectUniformBuffer m_MVPMatrixUniformBuffer;
 

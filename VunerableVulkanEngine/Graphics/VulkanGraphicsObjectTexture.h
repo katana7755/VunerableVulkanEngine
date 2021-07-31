@@ -40,6 +40,10 @@ private:
 	VkDeviceMemory m_ImageMemory;
 	VkImageView m_ImageView;
 
+	// We need a sampler. Let's make VulkanGraphicsObjectSampler!!!
+	// Additionally, we need to declare the descriptor set layour in ResourceManager.
+	// Lastly, we are going to the texture view and the sampler in the descriptor set....
+
 	bool m_IsStagingBufferExist;
 	VkDeviceMemory m_StagingMemory;
 	VkBuffer m_StagingBuffer;

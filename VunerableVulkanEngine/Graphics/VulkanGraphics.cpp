@@ -20,6 +20,7 @@ VulkanGraphics::~VulkanGraphics()
 
 	m_MVPMatrixUniformBuffer.Destroy();
 	m_DepthTexture.Destroy();
+	m_CharacterBodySampler.Destroy();
 	m_CharacterBodyTexture.Destroy();
 	m_CharacterMesh.Destroy();
 
@@ -45,6 +46,7 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 
 	m_CharacterMesh.CreateFromFBX("../FBXs/free_male_1.FBX");
 	m_CharacterBodyTexture.CreateAsTexture("../PNGs/free_male_1_body_diffuse.png");
+	m_CharacterBodySampler.Create();
 	m_DepthTexture.CreateAsDepthBuffer();
 	m_MVPMatrixUniformBuffer.Create();
 
@@ -64,6 +66,7 @@ void VulkanGraphics::Invalidate()
 {
 	m_MVPMatrixUniformBuffer.Destroy();
 	m_DepthTexture.Destroy();
+	m_CharacterBodySampler.Destroy();
 	m_CharacterBodyTexture.Destroy();
 	m_CharacterMesh.Destroy();
 
@@ -78,6 +81,7 @@ void VulkanGraphics::Invalidate()
 
 	m_CharacterMesh.CreateFromFBX("../FBXs/free_male_1.FBX");
 	m_CharacterBodyTexture.CreateAsTexture("../PNGs/free_male_1_body_diffuse.png");
+	m_CharacterBodySampler.Create();
 	m_DepthTexture.CreateAsDepthBuffer();
 	m_MVPMatrixUniformBuffer.Create();
 
@@ -335,7 +339,7 @@ void VulkanGraphics::BuildRenderLoop()
 
 	std::vector<int> descSetLayoutArray;
 	{
-		//descSetLayoutArray.push_back(m_ResourcePipelineMgr.CreateDescriptorSetLayout());
+		descSetLayoutArray.push_back(m_ResourcePipelineMgr.CreateDescriptorSetLayout());
 	}
 	
 	// TODO: when we have proper scene setting flow, remove this codes and replace with that...
@@ -357,6 +361,10 @@ void VulkanGraphics::BuildRenderLoop()
 
 	int pipelineIndex = m_ResourcePipelineMgr.CreateGraphicsPipeline(vertexShaderModuleIndex, fragmentShaderModuleIndex, pipelineLayoutIndex, renderPassIndex, 0);
 	m_ResourcePipelineMgr.EndToCreateGraphicsPipeline();
+
+	int descriptorPoolIndex = m_ResourcePipelineMgr.CreateDescriptorPool();
+	int descriptorSetIndex = m_ResourcePipelineMgr.AllocateDescriptorSet(descriptorPoolIndex, descSetLayoutArray[0]);
+	m_ResourcePipelineMgr.UpdateDescriptorSet(descriptorSetIndex, m_CharacterBodyTexture.GetImageView(), m_CharacterBodySampler.GetSampler());
 
 	auto beginInfo = VkCommandBufferBeginInfo();
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -381,7 +389,7 @@ void VulkanGraphics::BuildRenderLoop()
 		std::vector<VkClearValue> clearValueArray;
 		{
 			auto clearValue = VkClearValue();
-			clearValue.color = { 0.0f, 0.0f, 0.0f, 0.0f };
+			clearValue.color = { 0.0f, 0.0f, 1.0f, 1.0f };
 			clearValue.depthStencil.depth = 0.0f;
 			clearValue.depthStencil.stencil = 0;
 			clearValueArray.push_back(clearValue);
@@ -410,6 +418,7 @@ void VulkanGraphics::BuildRenderLoop()
 		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, sizeof(pushMVPMatrix), sizeof(mainLightDirection), &mainLightDirection);
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &m_CharacterMesh.GetVertexBuffer(), new VkDeviceSize[]{ 0 }); // TODO: one day consider to bind multiple vertex buffers simultaneously...
 		vkCmdBindIndexBuffer(commandBuffer, m_CharacterMesh.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, m_ResourcePipelineMgr.GetDescriptorSetArray().size(), m_ResourcePipelineMgr.GetDescriptorSetArray().data(), 0, NULL); // TODO: what is dynamic offset and when do we need it?
 		vkCmdDrawIndexed(commandBuffer, m_CharacterMesh.GetIndexCount(), 1, 0, 0, 0);
 		vkCmdEndRenderPass(commandBuffer);
 		result = vkEndCommandBuffer(commandBuffer);

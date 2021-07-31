@@ -27,6 +27,12 @@ public:
 	static void EndToCreateGraphicsPipeline();
 	static const VkPipeline& GetGraphicsPipeline(int index);
 	static void DestroyGraphicsPipeline(int index);
+	static int CreateDescriptorPool();
+	static void DestroyDescriptorPool(int index);
+	static int AllocateDescriptorSet(int poolIndex, int layoutIndex);
+	static void UpdateDescriptorSet(int index, const VkImageView& imageView, const VkSampler& sampler);
+	static void ReleaseDescriptorSet(int index);
+	static const std::vector<VkDescriptorSet>& GetDescriptorSetArray();
 
 private:
 	static VkPipelineCache s_PipelineCache;
@@ -38,6 +44,9 @@ private:
 	static std::vector<VkPipelineLayout> s_PipelineLayoutArray;
 	static std::vector<VkGraphicsPipelineCreateInfo> s_GraphicsPipelineCreateInfoArray;
 	static std::vector<VkPipeline> s_GraphicsPipelineArray;
+	static std::vector<VkDescriptorPool> s_DescriptorPoolArray;
+	static std::vector<int> s_DescriptorPoolIndexArray;
+	static std::vector<VkDescriptorSet> s_DescriptorSetArray;
 
 protected:
 	virtual bool CreateInternal() override;
