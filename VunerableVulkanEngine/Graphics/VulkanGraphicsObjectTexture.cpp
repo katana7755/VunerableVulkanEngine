@@ -82,6 +82,22 @@ void VulkanGraphicsObjectTexture::ApplyStagingBuffer(VkCommandBuffer& commandBuf
 	copyInfo.imageOffset = { 0, 0, 0 };
 	copyInfo.imageExtent = { m_Width, m_Height, 1 };
 	vkCmdCopyBufferToImage(commandBuffer, m_StagingBuffer, m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyInfo);
+
+	imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	imageBarrier.pNext = NULL;
+	imageBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	imageBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	imageBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	imageBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	imageBarrier.image = m_Image;
+	imageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	imageBarrier.subresourceRange.baseMipLevel = 0;
+	imageBarrier.subresourceRange.levelCount = 1;
+	imageBarrier.subresourceRange.baseArrayLayer = 0;
+	imageBarrier.subresourceRange.layerCount = 1;
+	vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &imageBarrier);
 }
 
 void VulkanGraphicsObjectTexture::ClearStagingBuffer()
