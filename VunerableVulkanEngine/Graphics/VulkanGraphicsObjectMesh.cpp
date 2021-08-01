@@ -7,26 +7,26 @@
 FbxManager* gFBXManagerPtr = NULL;
 FbxScene* gFBXScenePtr = NULL;
 
-void SetNormalAttribute(std::vector<VertexData>& vertexDataArray, int vertexIndex, FbxVector4 val)
+void SetNormalAttribute(VertexData vertexDatas[3], int vertexIndex, FbxVector4 val)
 {
-	auto vertexData = vertexDataArray[vertexIndex];
-	vertexData.m_Normal += glm::vec3(val[0], val[1], val[2]);;
-	vertexDataArray[vertexIndex] = vertexData;
+	auto vertexData = vertexDatas[vertexIndex];
+	vertexData.m_Normal = glm::vec3(val[0], val[1], val[2]);;
+	vertexDatas[vertexIndex] = vertexData;
 }
 
-void SetUVAttribute(std::vector<VertexData>& vertexDataArray, int vertexIndex, FbxVector2 val)
+void SetUVAttribute(VertexData vertexDatas[3], int vertexIndex, FbxVector2 val)
 {
-	auto vertexData = vertexDataArray[vertexIndex];
-	vertexData.m_UV += glm::vec2(val[0], val[1]);;
-	vertexDataArray[vertexIndex] = vertexData;
+	auto vertexData = vertexDatas[vertexIndex];
+	vertexData.m_UV = glm::vec2(val[0], 1.0f - val[1]);;
+	vertexDatas[vertexIndex] = vertexData;
 }
 
 template <class TFbxLayerElementType, class TValue>
 struct VertexAttributeUtil
 {
-	typedef void (*FuncSetter)(std::vector<VertexData>& vertexDataArray, int vertexIndex, TValue val);
+	typedef void (*FuncSetter)(VertexData vertexDatas[3], int vertexIndex, TValue val);
 
-	static void HandleWhenTriangle(const TFbxLayerElementType* elementPtr, std::vector<VertexData>& vertexDataArray, FuncSetter funcSetter, int vertexIndices[3], int polygonIndex, std::vector<int>& attributeCountArray)
+	static void HandleWhenTriangle(const TFbxLayerElementType* elementPtr, VertexData vertexDatas[3], FuncSetter funcSetter, int vertexIndices[3], int polygonIndex)
 	{
 		auto directArray = (elementPtr != NULL) ? &elementPtr->GetDirectArray() : NULL;
 		auto indirectArray = (elementPtr != NULL) ? &elementPtr->GetIndexArray() : NULL;
@@ -36,7 +36,7 @@ struct VertexAttributeUtil
 			return;
 		}
 
-		int indirectIndices[3] = { vertexIndices[0], vertexIndices[1], vertexIndices[2] };
+		int directIndices[3] = { vertexIndices[0], vertexIndices[1], vertexIndices[2] };
 
 		switch (elementPtr->GetMappingMode())
 		{
@@ -44,9 +44,9 @@ struct VertexAttributeUtil
 			break;
 
 		case FbxGeometryElement::eByPolygonVertex:
-			indirectIndices[0] = polygonIndex + 0;
-			indirectIndices[1] = polygonIndex + 1;
-			indirectIndices[2] = polygonIndex + 2;
+			directIndices[0] = polygonIndex + 0;
+			directIndices[1] = polygonIndex + 1;
+			directIndices[2] = polygonIndex + 2;
 			break;
 
 		default:
@@ -60,8 +60,7 @@ struct VertexAttributeUtil
 		{
 			for (int i = 0; i < 3; ++i)
 			{
-				(*funcSetter)(vertexDataArray, vertexIndices[i], directArray->GetAt(indirectIndices[i]));
-				++attributeCountArray[vertexIndices[i]];
+				(*funcSetter)(vertexDatas, i, directArray->GetAt(directIndices[i]));
 			}
 		}
 		break;
@@ -70,9 +69,8 @@ struct VertexAttributeUtil
 		{
 			for (int i = 0; i < 3; ++i)
 			{
-				int id = indirectArray->GetAt(indirectIndices[i]);
-				(*funcSetter)(vertexDataArray, vertexIndices[i], directArray->GetAt(id));
-				++attributeCountArray[vertexIndices[i]];
+				int directIndex = indirectArray->GetAt(directIndices[i]);
+				(*funcSetter)(vertexDatas, i, directArray->GetAt(directIndex));
 			}
 		}
 		break;
@@ -159,9 +157,8 @@ void VulkanGraphicsObjectMesh::CreateFromFBX(const char* strFbxPath)
 	//       - texture
 	//       - skeleton animation
 	//       - blend shape animation
+	auto positionDataArray = std::vector<glm::vec3>();
 	auto vertexDataArray = std::vector<VertexData>();
-	auto vertexNormalCountArray = std::vector<int>();
-	auto vertexUVCountArray = std::vector<int>();
 	auto indexDataArray = std::vector<int>();
 	auto nodeQueue = std::queue<FbxNode*>();
 	nodeQueue.push(gFBXScenePtr->GetRootNode());
@@ -194,19 +191,12 @@ void VulkanGraphicsObjectMesh::CreateFromFBX(const char* strFbxPath)
 
 			int controlPointCount = mesh->GetControlPointsCount();
 			auto controlPointArray = mesh->GetControlPoints();
-			vertexDataArray.resize(controlPointCount);
-			vertexNormalCountArray.resize(controlPointCount, 0);
-			vertexUVCountArray.resize(controlPointCount, 0);
+			positionDataArray.resize(controlPointCount);
 
 			for (int i = 0; i < controlPointCount; ++i)
 			{
 				auto controlPoint = controlPointArray[i];
-				auto vertexData = vertexDataArray[i];
-				vertexData.m_Position = glm::vec3((float)controlPoint[0], (float)controlPoint[1], (float)controlPoint[2]);
-				vertexData.m_UV = glm::vec2(0.0f, 0.0f);
-				vertexData.m_Normal = glm::vec3(0.0f, 0.0f, 1.0f);
-				vertexData.m_Color = glm::vec3(1.0f, 1.0f, 1.0f);
-				vertexDataArray[i] = vertexData;
+				positionDataArray[i] = glm::vec3((float)controlPoint[0], (float)controlPoint[1], (float)controlPoint[2]);
 			}
 
 			int polygonCount = mesh->GetPolygonCount();
@@ -215,6 +205,7 @@ void VulkanGraphicsObjectMesh::CreateFromFBX(const char* strFbxPath)
 			auto elementNormalPtr = (layerPtr != NULL) ? layerPtr->GetNormals() : NULL;
 			auto elementUVPtr = (layerPtr != NULL) ? layerPtr->GetUVs() : NULL;
 			int vertexIndices[3];
+			VertexData vertexDatas[3];
 
 			for (int i = 0; i < polygonCount; ++i)
 			{
@@ -225,11 +216,18 @@ void VulkanGraphicsObjectMesh::CreateFromFBX(const char* strFbxPath)
 					vertexIndices[0] = mesh->GetPolygonVertex(i, 0);
 					vertexIndices[1] = mesh->GetPolygonVertex(i, 1);
 					vertexIndices[2] = mesh->GetPolygonVertex(i, 2);
-					indexDataArray.push_back(vertexIndices[0]);
-					indexDataArray.push_back(vertexIndices[1]);
-					indexDataArray.push_back(vertexIndices[2]);
-					VertexAttributeUtil<FbxLayerElementNormal, FbxVector4>::HandleWhenTriangle(elementNormalPtr, vertexDataArray, &SetNormalAttribute, vertexIndices, polygonIndex, vertexNormalCountArray);
-					VertexAttributeUtil<FbxLayerElementUV, FbxVector2>::HandleWhenTriangle(elementUVPtr, vertexDataArray, &SetUVAttribute, vertexIndices, polygonIndex, vertexUVCountArray);
+					vertexDatas[0].m_Position = positionDataArray[vertexIndices[0]];
+					vertexDatas[1].m_Position = positionDataArray[vertexIndices[1]];
+					vertexDatas[2].m_Position = positionDataArray[vertexIndices[2]];
+					VertexAttributeUtil<FbxLayerElementNormal, FbxVector4>::HandleWhenTriangle(elementNormalPtr, vertexDatas, &SetNormalAttribute, vertexIndices, polygonIndex);
+					VertexAttributeUtil<FbxLayerElementUV, FbxVector2>::HandleWhenTriangle(elementUVPtr, vertexDatas, &SetUVAttribute, vertexIndices, polygonIndex);
+					indexDataArray.push_back(polygonIndex + 0);
+					indexDataArray.push_back(polygonIndex + 1);
+					indexDataArray.push_back(polygonIndex + 2);
+					vertexDataArray.push_back(vertexDatas[0]);
+					vertexDataArray.push_back(vertexDatas[1]);
+					vertexDataArray.push_back(vertexDatas[2]);
+
 					polygonIndex += 3;
 				}
 				else
@@ -241,14 +239,6 @@ void VulkanGraphicsObjectMesh::CreateFromFBX(const char* strFbxPath)
 				}
 			}
 			
-			for (int i = 0; i < controlPointCount; ++i)
-			{
-				auto vertexData = vertexDataArray[i];
-				vertexData.m_Normal = (vertexNormalCountArray[i] > 1) ? vertexData.m_Normal / (float)vertexNormalCountArray[i] : vertexData.m_Normal;
-				vertexData.m_UV = (vertexUVCountArray[i] > 1) ? vertexData.m_UV / (float)vertexUVCountArray[i] : vertexData.m_UV;
-				vertexDataArray[i] = vertexData;
-			}
-
 			break;
 		}
 

@@ -348,7 +348,6 @@ void VulkanGraphics::BuildRenderLoop()
 	glm::mat4x4 pushProjectionMatrix = glm::perspective(glm::radians(60.0f), (float)width / height, 0.01f, 1000.0f);
 	glm::mat4x4 pushMVPMatrix = pushProjectionMatrix * viewMatrix * modelMatrix;
 	glm::vec3 mainLightDirection = glm::vec3(0.0f, 0.0f, 1.0f);
-
 	std::vector<int> pushConstantRangeArray;
 	{
 		pushConstantRangeArray.push_back(m_ResourcePipelineMgr.CreatePushConstantRange(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushMVPMatrix) + sizeof(mainLightDirection)));
