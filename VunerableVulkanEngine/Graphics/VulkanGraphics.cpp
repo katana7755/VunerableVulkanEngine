@@ -20,6 +20,8 @@ VulkanGraphics::~VulkanGraphics()
 
 	m_MVPMatrixUniformBuffer.Destroy();
 	m_DepthTexture.Destroy();
+	m_CharacterHeadSampler.Destroy();
+	m_CharacterHeadTexture.Destroy();
 	m_CharacterBodySampler.Destroy();
 	m_CharacterBodyTexture.Destroy();
 	m_CharacterMesh.Destroy();
@@ -45,6 +47,8 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 	m_ResourcePipelineMgr.Create();
 
 	m_CharacterMesh.CreateFromFBX("../FBXs/free_male_1.FBX");
+	m_CharacterHeadTexture.CreateAsTexture("../PNGs/free_male_1_head_diffuse.png");
+	m_CharacterHeadSampler.Create();
 	m_CharacterBodyTexture.CreateAsTexture("../PNGs/free_male_1_body_diffuse.png");
 	m_CharacterBodySampler.Create();
 	m_DepthTexture.CreateAsDepthBuffer();
@@ -66,6 +70,8 @@ void VulkanGraphics::Invalidate()
 {
 	m_MVPMatrixUniformBuffer.Destroy();
 	m_DepthTexture.Destroy();
+	m_CharacterHeadSampler.Destroy();
+	m_CharacterHeadTexture.Destroy();
 	m_CharacterBodySampler.Destroy();
 	m_CharacterBodyTexture.Destroy();
 	m_CharacterMesh.Destroy();
@@ -80,6 +86,8 @@ void VulkanGraphics::Invalidate()
 	m_ResourcePipelineMgr.Create();
 
 	m_CharacterMesh.CreateFromFBX("../FBXs/free_male_1.FBX");
+	m_CharacterHeadTexture.CreateAsTexture("../PNGs/free_male_1_head_diffuse.png");
+	m_CharacterHeadSampler.Create();
 	m_CharacterBodyTexture.CreateAsTexture("../PNGs/free_male_1_body_diffuse.png");
 	m_CharacterBodySampler.Create();
 	m_DepthTexture.CreateAsDepthBuffer();
@@ -94,6 +102,11 @@ void VulkanGraphics::Invalidate()
 
 void VulkanGraphics::TransferAllStagingBuffers()
 {
+	if (!m_CharacterHeadTexture.IsStagingBufferExist())
+	{
+		return;
+	}
+
 	if (!m_CharacterBodyTexture.IsStagingBufferExist())
 	{
 		return;
@@ -117,6 +130,7 @@ void VulkanGraphics::TransferAllStagingBuffers()
 		throw;
 	}
 
+	m_CharacterHeadTexture.ApplyStagingBuffer(commandBuffer);
 	m_CharacterBodyTexture.ApplyStagingBuffer(commandBuffer);
 
 	result = vkEndCommandBuffer(commandBuffer);
@@ -158,6 +172,7 @@ void VulkanGraphics::TransferAllStagingBuffers()
 	}
 
 	m_ResourceCommandBufferMgr.ClearAdditionalCommandBuffer();
+	m_CharacterHeadTexture.ClearStagingBuffer();
 	m_CharacterBodyTexture.ClearStagingBuffer();
 }
 
@@ -363,7 +378,8 @@ void VulkanGraphics::BuildRenderLoop()
 
 	int descriptorPoolIndex = m_ResourcePipelineMgr.CreateDescriptorPool();
 	int descriptorSetIndex = m_ResourcePipelineMgr.AllocateDescriptorSet(descriptorPoolIndex, descSetLayoutArray[0]);
-	m_ResourcePipelineMgr.UpdateDescriptorSet(descriptorSetIndex, m_CharacterBodyTexture.GetImageView(), m_CharacterBodySampler.GetSampler());
+	m_ResourcePipelineMgr.UpdateDescriptorSet(descriptorSetIndex, 0, m_CharacterHeadTexture.GetImageView(), m_CharacterHeadSampler.GetSampler());
+	m_ResourcePipelineMgr.UpdateDescriptorSet(descriptorSetIndex, 1, m_CharacterBodyTexture.GetImageView(), m_CharacterBodySampler.GetSampler());
 
 	auto beginInfo = VkCommandBufferBeginInfo();
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;

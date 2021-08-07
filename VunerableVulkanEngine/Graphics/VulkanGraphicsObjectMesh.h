@@ -6,7 +6,7 @@ struct VertexData
 	glm::vec3 m_Position;
 	glm::vec2 m_UV;
 	glm::vec3 m_Normal;
-	glm::vec3 m_Color;
+	float m_Material;
 };
 
 #pragma once

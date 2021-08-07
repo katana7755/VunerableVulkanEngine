@@ -7,6 +7,11 @@
 FbxManager* gFBXManagerPtr = NULL;
 FbxScene* gFBXScenePtr = NULL;
 
+FbxSurfaceMaterial* GetMaterialFromNode(const FbxNode* node, int directIndex)
+{
+	return node->GetMaterial(directIndex);
+}
+
 void SetNormalAttribute(VertexData vertexDatas[3], int vertexIndex, FbxVector4 val)
 {
 	auto vertexData = vertexDatas[vertexIndex];
@@ -21,12 +26,20 @@ void SetUVAttribute(VertexData vertexDatas[3], int vertexIndex, FbxVector2 val)
 	vertexDatas[vertexIndex] = vertexData;
 }
 
-template <class TFbxLayerElementType, class TValue>
+void SetDirectIndexAttribute(VertexData vertexDatas[3], int vertexIndex, int val)
+{
+	auto vertexData = vertexDatas[vertexIndex];
+	vertexData.m_Material = (float)val;
+	vertexDatas[vertexIndex] = vertexData;
+}
+
+template <class TFbxLayerElementType, class TReturnValue>
 struct VertexAttributeUtil
 {
-	typedef void (*FuncSetter)(VertexData vertexDatas[3], int vertexIndex, TValue val);
+	typedef void (*FuncSetter)(VertexData vertexDatas[3], int vertexIndex, TReturnValue val);
+	typedef void (*FuncIntegerSetter)(VertexData vertexDatas[3], int vertexIndex, int val);
 
-	static void HandleWhenTriangle(const TFbxLayerElementType* elementPtr, VertexData vertexDatas[3], FuncSetter funcSetter, int vertexIndices[3], int polygonIndex)
+	static void HandleWhenTriangle(const TFbxLayerElementType* elementPtr, VertexData vertexDatas[3], FuncSetter funcSetter, int vertexIndices[3], int polygonVertexIndex)
 	{
 		auto directArray = (elementPtr != NULL) ? &elementPtr->GetDirectArray() : NULL;
 		auto indirectArray = (elementPtr != NULL) ? &elementPtr->GetIndexArray() : NULL;
@@ -36,50 +49,136 @@ struct VertexAttributeUtil
 			return;
 		}
 
-		int directIndices[3] = { vertexIndices[0], vertexIndices[1], vertexIndices[2] };
+		int directIndices[3];
+		int polygonIndex = polygonVertexIndex / 3;
 
 		switch (elementPtr->GetMappingMode())
 		{
-		case FbxGeometryElement::eByControlPoint:
-			break;
+			case FbxGeometryElement::eByControlPoint:
+				directIndices[0] = vertexIndices[0];
+				directIndices[1] = vertexIndices[1];
+				directIndices[2] = vertexIndices[2];
+				break;
 
-		case FbxGeometryElement::eByPolygonVertex:
-			directIndices[0] = polygonIndex + 0;
-			directIndices[1] = polygonIndex + 1;
-			directIndices[2] = polygonIndex + 2;
-			break;
+			case FbxGeometryElement::eByPolygonVertex:
+				directIndices[0] = polygonVertexIndex + 0;
+				directIndices[1] = polygonVertexIndex + 1;
+				directIndices[2] = polygonVertexIndex + 2;
+				break;
 
-		default:
-			printf_console("!!!! - -1\n");
-			throw;
+			case FbxGeometryElement::eByPolygon:
+				directIndices[0] = polygonIndex;
+				directIndices[1] = polygonIndex;
+				directIndices[2] = polygonIndex;
+				break;
+
+			default:
+				printf_console("!!!! - -1\n");
+				throw;
 		}
 
 		switch (elementPtr->GetReferenceMode())
 		{
-		case FbxGeometryElement::eDirect:
-		{
-			for (int i = 0; i < 3; ++i)
-			{
-				(*funcSetter)(vertexDatas, i, directArray->GetAt(directIndices[i]));
-			}
-		}
-		break;
+			case FbxGeometryElement::eDirect:
+				{
+					for (int i = 0; i < 3; ++i)
+					{
+						(*funcSetter)(vertexDatas, i, directArray->GetAt(directIndices[i]));
+					}
+				}
+				break;
 
-		case FbxGeometryElement::eIndexToDirect:
-		{
-			for (int i = 0; i < 3; ++i)
-			{
-				int directIndex = indirectArray->GetAt(directIndices[i]);
-				(*funcSetter)(vertexDatas, i, directArray->GetAt(directIndex));
-			}
-		}
-		break;
+			//case FbxGeometryElement::eIndex:
+			//	{
+			//		for (int i = 0; i < 3; ++i)
+			//		{
+			//			(*funcSetter)(vertexDatas, i, indirectArray->GetAt(directIndices[i]));
+			//		}
+			//	}
+			//	break;
 
-		default:
-			printf_console("!!!! - -2\n");
-			throw;
+			case FbxGeometryElement::eIndexToDirect:
+				{
+					for (int i = 0; i < 3; ++i)
+					{
+						int directIndex = indirectArray->GetAt(directIndices[i]);
+						(*funcSetter)(vertexDatas, i, directArray->GetAt(directIndex));
+					}
+				}
+				break;
+
+			default:
+				printf_console("!!!! - -2\n");
+				throw;
 		}
 	}
+
+	static void HandleWhenTriangleNoDirectArray(const TFbxLayerElementType* elementPtr, VertexData vertexDatas[3], FuncIntegerSetter funcSetter, int vertexIndices[3], int polygonVertexIndex)
+	{
+		auto indirectArray = (elementPtr != NULL) ? &elementPtr->GetIndexArray() : NULL;
+		int directIndices[3];
+		int polygonIndex = polygonVertexIndex / 3;
+
+		switch (elementPtr->GetMappingMode())
+		{
+			case FbxGeometryElement::eByControlPoint:
+				directIndices[0] = vertexIndices[0];
+				directIndices[1] = vertexIndices[1];
+				directIndices[2] = vertexIndices[2];
+				break;
+
+			case FbxGeometryElement::eByPolygonVertex:
+				directIndices[0] = polygonVertexIndex + 0;
+				directIndices[1] = polygonVertexIndex + 1;
+				directIndices[2] = polygonVertexIndex + 2;
+				break;
+
+			case FbxGeometryElement::eByPolygon:
+				directIndices[0] = polygonIndex;
+				directIndices[1] = polygonIndex;
+				directIndices[2] = polygonIndex;
+				break;
+
+			default:
+				printf_console("!!!! - -1 : %d\n", elementPtr->GetMappingMode());
+				throw;
+		}
+
+		switch (elementPtr->GetReferenceMode())
+		{
+			case FbxGeometryElement::eDirect:
+				{
+					for (int i = 0; i < 3; ++i)
+					{
+						(*funcSetter)(vertexDatas, i, directIndices[i]);
+					}
+				}
+				break;
+
+			case FbxGeometryElement::eIndex:
+				{
+					for (int i = 0; i < 3; ++i)
+					{
+						(*funcSetter)(vertexDatas, i, indirectArray->GetAt(directIndices[i]));
+					}
+				}
+				break;
+
+			case FbxGeometryElement::eIndexToDirect:
+				{
+					for (int i = 0; i < 3; ++i)
+					{
+						int directIndex = indirectArray->GetAt(directIndices[i]);
+						(*funcSetter)(vertexDatas, i, directIndex);
+					}
+				}
+				break;
+
+			default:
+				printf_console("!!!! - -2 : %d\n", elementPtr->GetReferenceMode());
+				throw;
+		}
+	}	
 };
 
 void VulkanGraphicsObjectMesh::CreateFromFBX(const char* strFbxPath)
@@ -200,10 +299,11 @@ void VulkanGraphicsObjectMesh::CreateFromFBX(const char* strFbxPath)
 			}
 
 			int polygonCount = mesh->GetPolygonCount();
-			int polygonIndex = 0;
+			int polygonVertexIndex = 0;
 			auto layerPtr = (mesh->GetLayerCount() > 0) ? mesh->GetLayer(0) : NULL; // TODO: need to research on what the purpose multiple layers are...
-			auto elementNormalPtr = (layerPtr != NULL) ? layerPtr->GetNormals() : NULL;
 			auto elementUVPtr = (layerPtr != NULL) ? layerPtr->GetUVs() : NULL;
+			auto elementNormalPtr = (layerPtr != NULL) ? layerPtr->GetNormals() : NULL;
+			auto elementMaterialPtr = (layerPtr != NULL) ? layerPtr->GetMaterials() : NULL;
 			int vertexIndices[3];
 			VertexData vertexDatas[3];
 
@@ -219,16 +319,17 @@ void VulkanGraphicsObjectMesh::CreateFromFBX(const char* strFbxPath)
 					vertexDatas[0].m_Position = positionDataArray[vertexIndices[0]];
 					vertexDatas[1].m_Position = positionDataArray[vertexIndices[1]];
 					vertexDatas[2].m_Position = positionDataArray[vertexIndices[2]];
-					VertexAttributeUtil<FbxLayerElementNormal, FbxVector4>::HandleWhenTriangle(elementNormalPtr, vertexDatas, &SetNormalAttribute, vertexIndices, polygonIndex);
-					VertexAttributeUtil<FbxLayerElementUV, FbxVector2>::HandleWhenTriangle(elementUVPtr, vertexDatas, &SetUVAttribute, vertexIndices, polygonIndex);
-					indexDataArray.push_back(polygonIndex + 0);
-					indexDataArray.push_back(polygonIndex + 1);
-					indexDataArray.push_back(polygonIndex + 2);
+					VertexAttributeUtil<FbxLayerElementUV, FbxVector2>::HandleWhenTriangle(elementUVPtr, vertexDatas, &SetUVAttribute, vertexIndices, polygonVertexIndex);
+					VertexAttributeUtil<FbxLayerElementNormal, FbxVector4>::HandleWhenTriangle(elementNormalPtr, vertexDatas, &SetNormalAttribute, vertexIndices, polygonVertexIndex);
+					VertexAttributeUtil<FbxLayerElementMaterial, int>::HandleWhenTriangleNoDirectArray(elementMaterialPtr, vertexDatas, &SetDirectIndexAttribute, vertexIndices, polygonVertexIndex);
+					indexDataArray.push_back(polygonVertexIndex + 0);
+					indexDataArray.push_back(polygonVertexIndex + 1);
+					indexDataArray.push_back(polygonVertexIndex + 2);
 					vertexDataArray.push_back(vertexDatas[0]);
 					vertexDataArray.push_back(vertexDatas[1]);
 					vertexDataArray.push_back(vertexDatas[2]);
 
-					polygonIndex += 3;
+					polygonVertexIndex += 3;
 				}
 				else
 				{

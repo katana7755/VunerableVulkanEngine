@@ -30,7 +30,7 @@ public:
 	static int CreateDescriptorPool();
 	static void DestroyDescriptorPool(int index);
 	static int AllocateDescriptorSet(int poolIndex, int layoutIndex);
-	static void UpdateDescriptorSet(int index, const VkImageView& imageView, const VkSampler& sampler);
+	static void UpdateDescriptorSet(int index, int binding, const VkImageView& imageView, const VkSampler& sampler);
 	static void ReleaseDescriptorSet(int index);
 	static const std::vector<VkDescriptorSet>& GetDescriptorSetArray();
 

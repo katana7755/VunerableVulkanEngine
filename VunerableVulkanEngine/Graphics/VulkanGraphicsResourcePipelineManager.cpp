@@ -148,6 +148,16 @@ int VulkanGraphicsResourcePipelineManager::CreateDescriptorSetLayout()
         descSetLayoutBindingArray.push_back(binding);
     }
 
+    {
+        auto binding = VkDescriptorSetLayoutBinding();
+        binding.binding = 1;
+        binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        binding.descriptorCount = 1;
+        binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        binding.pImmutableSamplers = NULL;
+        descSetLayoutBindingArray.push_back(binding);
+    }
+
     auto createInfo = VkDescriptorSetLayoutCreateInfo();
     createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     createInfo.pNext = NULL;
@@ -319,8 +329,8 @@ int VulkanGraphicsResourcePipelineManager::CreateGraphicsPipeline(int vertexShad
         auto attributeDesc = VkVertexInputAttributeDescription();
         attributeDesc.location = 3;
         attributeDesc.binding = 0;
-        attributeDesc.format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDesc.offset = offsetof(VertexData, m_Color);
+        attributeDesc.format = VK_FORMAT_R32_SFLOAT;
+        attributeDesc.offset = offsetof(VertexData, m_Material);
         vertexInputAttributeDescArray.push_back(attributeDesc);
     }
 
@@ -518,7 +528,7 @@ int VulkanGraphicsResourcePipelineManager::CreateDescriptorPool()
     {
         auto poolSize = VkDescriptorPoolSize();
         poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSize.descriptorCount = 1;
+        poolSize.descriptorCount = 2;
         poolSizeArray.push_back(poolSize);
     }
 
@@ -576,7 +586,7 @@ int VulkanGraphicsResourcePipelineManager::AllocateDescriptorSet(int poolIndex, 
     return s_DescriptorSetArray.size() - 1;
 }
 
-void VulkanGraphicsResourcePipelineManager::UpdateDescriptorSet(int index, const VkImageView& imageView, const VkSampler& sampler)
+void VulkanGraphicsResourcePipelineManager::UpdateDescriptorSet(int index, int binding, const VkImageView& imageView, const VkSampler& sampler)
 {
     std::vector<VkWriteDescriptorSet> writeSetArray;
     {
@@ -589,7 +599,7 @@ void VulkanGraphicsResourcePipelineManager::UpdateDescriptorSet(int index, const
         writeSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writeSet.pNext = NULL;
         writeSet.dstSet = s_DescriptorSetArray[index];
-        writeSet.dstBinding = 0;
+        writeSet.dstBinding = binding;
         writeSet.dstArrayElement = 0;
         writeSet.descriptorCount = 1;
         writeSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;

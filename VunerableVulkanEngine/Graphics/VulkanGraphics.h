@@ -39,6 +39,8 @@ private:
 	VulkanGraphicsResourcePipelineManager m_ResourcePipelineMgr;
 
 	VulkanGraphicsObjectMesh m_CharacterMesh;
+	VulkanGraphicsObjectTexture m_CharacterHeadTexture;
+	VulkanGraphicsObjectSampler m_CharacterHeadSampler;
 	VulkanGraphicsObjectTexture m_CharacterBodyTexture;
 	VulkanGraphicsObjectSampler m_CharacterBodySampler;
 	VulkanGraphicsObjectTexture m_DepthTexture;
