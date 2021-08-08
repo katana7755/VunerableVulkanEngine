@@ -52,7 +52,6 @@ private:
 	VulkanGraphicsObjectUniformBuffer m_MVPMatrixUniformBuffer;
 
 	int m_AcquireNextImageSemaphoreIndex;
-	int m_QueueSubmitFenceIndex;
 	int m_QueueSubmitPrimarySemaphoreIndex;
 	int m_QueueSubmitAdditionalSemaphoreIndex;
 

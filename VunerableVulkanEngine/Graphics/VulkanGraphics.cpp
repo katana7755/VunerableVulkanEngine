@@ -55,7 +55,6 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 	m_MVPMatrixUniformBuffer.Create();
 
 	m_AcquireNextImageSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
-	m_QueueSubmitFenceIndex = m_ResourcePipelineMgr.CreateGfxFence();
 	m_QueueSubmitPrimarySemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
 	m_QueueSubmitAdditionalSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
 
@@ -95,7 +94,6 @@ void VulkanGraphics::Invalidate()
 	m_MVPMatrixUniformBuffer.Create();
 
 	m_AcquireNextImageSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
-	m_QueueSubmitFenceIndex = m_ResourcePipelineMgr.CreateGfxFence();
 	m_QueueSubmitPrimarySemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
 	m_QueueSubmitAdditionalSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
 
@@ -188,10 +186,7 @@ void VulkanGraphics::SubmitPrimary()
 	TransferAllStagingBuffers();
 
 	auto acquireNextImageSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_AcquireNextImageSemaphoreIndex);
-	auto queueSubmitFence = m_ResourcePipelineMgr.GetGfxFence(m_QueueSubmitFenceIndex);
 	auto queueSubmitPrimarySemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_QueueSubmitPrimarySemaphoreIndex);
-	vkWaitForFences(m_ResourceDevice.GetLogicalDevice(), 1, &queueSubmitFence, VK_TRUE, UINT64_MAX);
-	vkResetFences(m_ResourceDevice.GetLogicalDevice(), 1, &queueSubmitFence);
 	VulkanGraphicsResourceSwapchain::AcquireNextImage(acquireNextImageSemaphore, VK_NULL_HANDLE);
 
 	auto imageIndex = VulkanGraphicsResourceSwapchain::GetAcquiredImageIndex();
@@ -227,7 +222,7 @@ void VulkanGraphics::SubmitPrimary()
 	submitInfo.signalSemaphoreCount = signalSemaphoreArray.size();
 	submitInfo.pSignalSemaphores = signalSemaphoreArray.data();
 
-	auto result = vkQueueSubmit(m_ResourceDevice.GetGraphicsQueue(), 1, &submitInfo, queueSubmitFence);
+	auto result = vkQueueSubmit(m_ResourceDevice.GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
 
 	if (result)
 	{
