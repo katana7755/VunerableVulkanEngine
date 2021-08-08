@@ -5,22 +5,27 @@
 class VulkanGraphicsResourceDevice : public VulkanGraphicsResourceBase
 {
 public:
-	static int GetGraphicsQueueFamilyIndex()
+	static const int& GetGraphicsQueueFamilyIndex()
 	{
 		return s_GraphicsQueueFamilyIndex;
 	}
 
-	static int GetPresentQueueFamilyIndex()
+	static const int& GetPresentQueueFamilyIndex()
 	{
 		return s_PresentQueueFamilyIndex;
 	}
 
-	static int GetTransferQueueFamilyIndex()
+	static const int& GetTransferQueueFamilyIndex()
 	{
 		return s_TransferQueueFamilyIndex;
 	}
 
-	static VkDevice GetLogicalDevice()
+	static const VkPhysicalDevice& GetPhysicalDevice()
+	{
+		return s_PhysicalDeviceArray[s_PhysicalDeviceIndex];
+	}
+
+	static const VkDevice& GetLogicalDevice()
 	{
 		return s_LogicalDevice;
 	}
@@ -59,17 +64,17 @@ public:
 		return false;
 	}
 
-	static VkQueue GetGraphicsQueue()
+	static const VkQueue& GetGraphicsQueue()
 	{
 		return s_GraphicsQueue;
 	}
 
-	static VkQueue GetPresentQueue()
+	static const VkQueue& GetPresentQueue()
 	{
 		return s_PresentQueue;
 	}
 
-	static VkQueue GetTransferQueue()
+	static const VkQueue& GetTransferQueue()
 	{
 		return s_TransferQueue;
 	}

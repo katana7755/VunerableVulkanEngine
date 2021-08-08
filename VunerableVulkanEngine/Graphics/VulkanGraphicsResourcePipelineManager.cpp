@@ -522,20 +522,12 @@ void VulkanGraphicsResourcePipelineManager::DestroyGraphicsPipeline(int index)
 }
 
 // TODO: we will implement the function in which we can create any descriptor freely
-int VulkanGraphicsResourcePipelineManager::CreateDescriptorPool()
+int VulkanGraphicsResourcePipelineManager::CreateDescriptorPool(const std::vector<VkDescriptorPoolSize>& poolSizeArray)
 {
-    auto poolSizeArray = std::vector<VkDescriptorPoolSize>();
-    {
-        auto poolSize = VkDescriptorPoolSize();
-        poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSize.descriptorCount = 2;
-        poolSizeArray.push_back(poolSize);
-    }
-
     auto createInfo = VkDescriptorPoolCreateInfo();
     createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     createInfo.pNext = NULL;
-    createInfo.flags = 0;
+    createInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     createInfo.maxSets = 1;
     createInfo.poolSizeCount = poolSizeArray.size();
     createInfo.pPoolSizes = poolSizeArray.data();

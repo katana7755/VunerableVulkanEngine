@@ -102,9 +102,12 @@ void VulkanGraphicsObjectTexture::ApplyStagingBuffer(VkCommandBuffer& commandBuf
 
 void VulkanGraphicsObjectTexture::ClearStagingBuffer()
 {
-	m_IsStagingBufferExist = false;
-	vkFreeMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_StagingMemory, NULL);
-	vkDestroyBuffer(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_StagingBuffer, NULL);
+	if (m_IsStagingBufferExist)
+	{
+		m_IsStagingBufferExist = false;
+		vkFreeMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_StagingMemory, NULL);
+		vkDestroyBuffer(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_StagingBuffer, NULL);
+	}
 }
 
 void VulkanGraphicsObjectTexture::CreateStagingBuffer(unsigned char* pixelData, VkDeviceSize imageSize)

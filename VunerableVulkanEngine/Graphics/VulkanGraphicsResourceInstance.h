@@ -4,7 +4,7 @@
 class VulkanGraphicsResourceInstance : public VulkanGraphicsResourceBase
 {
 public:
-	static VkInstance GetInstance()
+	static const VkInstance& GetInstance()
 	{
 		return s_Instance;
 	}

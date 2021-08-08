@@ -9,7 +9,7 @@
 class VulkanGraphicsResourceSurface : public VulkanGraphicsResourceBase
 {
 public:
-	static VkSurfaceKHR GetSurface()
+	static const VkSurfaceKHR& GetSurface()
 	{
 		return s_Surface;
 	}

@@ -25,7 +25,12 @@ public:
 
 	void Invalidate();
 	void TransferAllStagingBuffers();
-	void DrawFrame();
+	void InitializeFrame();
+	void SubmitPrimary();
+	void SubmitAdditional();
+	void PresentFrame();
+	void BeginRenderPass(const VkCommandBuffer& commandBuffer, int renderPassIndex);
+	void EndRenderPass(const VkCommandBuffer& commandBuffer);
 
 private:
 	void BuildRenderLoop();
@@ -48,7 +53,8 @@ private:
 
 	int m_AcquireNextImageSemaphoreIndex;
 	int m_QueueSubmitFenceIndex;
-	int m_QueueSubmitSemaphoreIndex;
+	int m_QueueSubmitPrimarySemaphoreIndex;
+	int m_QueueSubmitAdditionalSemaphoreIndex;
 
 private:
 	// TODO: Need to convert this into another object...

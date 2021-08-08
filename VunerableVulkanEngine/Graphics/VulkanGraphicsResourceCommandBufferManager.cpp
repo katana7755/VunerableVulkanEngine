@@ -63,14 +63,38 @@ const VkCommandBuffer& VulkanGraphicsResourceCommandBufferManager::AllocateAddit
 	return s_AdditionalBufferArray[offset];
 }
 
+void VulkanGraphicsResourceCommandBufferManager::FreeAdditionalCommandBuffer(const VkCommandBuffer& commandBuffer)
+{
+	auto iter = s_AdditionalBufferArray.begin();
+	auto end = s_AdditionalBufferArray.end();
+
+	while (iter != end)
+	{
+		if ((*iter) == commandBuffer)
+		{
+			break;
+		}
+
+		++iter;
+	}
+
+	if (iter == end)
+	{
+		return;
+	}
+
+	//vkFreeCommandBuffers(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_CommandGraphicsPool, 1, &commandBuffer);
+	s_AdditionalBufferArray.erase(iter);
+}
+
 const std::vector<VkCommandBuffer>& VulkanGraphicsResourceCommandBufferManager::GetAllAdditionalCommandBuffers()
 {
 	return s_AdditionalBufferArray;
 }
 
-void VulkanGraphicsResourceCommandBufferManager::ClearAdditionalCommandBuffer()
+void VulkanGraphicsResourceCommandBufferManager::ClearAdditionalCommandBuffers()
 {
-	vkFreeCommandBuffers(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_CommandGraphicsPool, s_AdditionalBufferArray.size(), s_AdditionalBufferArray.data());
+	//vkFreeCommandBuffers(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_CommandGraphicsPool, s_AdditionalBufferArray.size(), s_AdditionalBufferArray.data());
 	s_AdditionalBufferArray.clear();
 }
 
@@ -96,7 +120,7 @@ bool VulkanGraphicsResourceCommandBufferManager::CreateInternal()
 
 bool VulkanGraphicsResourceCommandBufferManager::DestroyInternal()
 {
-	ClearAdditionalCommandBuffer();
+	ClearAdditionalCommandBuffers();
 	FreePrimaryBufferArray();
 	vkDestroyCommandPool(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_CommandGraphicsPool, NULL);
 

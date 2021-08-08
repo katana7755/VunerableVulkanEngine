@@ -56,7 +56,8 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 
 	m_AcquireNextImageSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
 	m_QueueSubmitFenceIndex = m_ResourcePipelineMgr.CreateGfxFence();
-	m_QueueSubmitSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
+	m_QueueSubmitPrimarySemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
+	m_QueueSubmitAdditionalSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
 
 	char buffer[1024];
 	GetCurrentDirectory(1024, buffer);
@@ -95,7 +96,8 @@ void VulkanGraphics::Invalidate()
 
 	m_AcquireNextImageSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
 	m_QueueSubmitFenceIndex = m_ResourcePipelineMgr.CreateGfxFence();
-	m_QueueSubmitSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
+	m_QueueSubmitPrimarySemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
+	m_QueueSubmitAdditionalSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
 
 	BuildRenderLoop();
 }
@@ -171,18 +173,23 @@ void VulkanGraphics::TransferAllStagingBuffers()
 		throw;
 	}
 
-	m_ResourceCommandBufferMgr.ClearAdditionalCommandBuffer();
+	m_ResourceCommandBufferMgr.ClearAdditionalCommandBuffers();
 	m_CharacterHeadTexture.ClearStagingBuffer();
 	m_CharacterBodyTexture.ClearStagingBuffer();
 }
 
-void VulkanGraphics::DrawFrame()
+void VulkanGraphics::InitializeFrame()
+{
+	m_ResourceCommandBufferMgr.ClearAdditionalCommandBuffers();
+}
+
+void VulkanGraphics::SubmitPrimary()
 {
 	TransferAllStagingBuffers();
 
 	auto acquireNextImageSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_AcquireNextImageSemaphoreIndex);
 	auto queueSubmitFence = m_ResourcePipelineMgr.GetGfxFence(m_QueueSubmitFenceIndex);
-	auto queueSubmitSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_QueueSubmitSemaphoreIndex);
+	auto queueSubmitPrimarySemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_QueueSubmitPrimarySemaphoreIndex);
 	vkWaitForFences(m_ResourceDevice.GetLogicalDevice(), 1, &queueSubmitFence, VK_TRUE, UINT64_MAX);
 	vkResetFences(m_ResourceDevice.GetLogicalDevice(), 1, &queueSubmitFence);
 	VulkanGraphicsResourceSwapchain::AcquireNextImage(acquireNextImageSemaphore, VK_NULL_HANDLE);
@@ -206,7 +213,7 @@ void VulkanGraphics::DrawFrame()
 
 	std::vector<VkSemaphore> signalSemaphoreArray;
 	{
-		signalSemaphoreArray.push_back(queueSubmitSemaphore);
+		signalSemaphoreArray.push_back(queueSubmitPrimarySemaphore);
 	}
 
 	auto submitInfo = VkSubmitInfo();
@@ -228,17 +235,82 @@ void VulkanGraphics::DrawFrame()
 
 		throw;
 	}
+}
+
+void VulkanGraphics::SubmitAdditional()
+{
+	auto queueSubmitPrimarySemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_QueueSubmitPrimarySemaphoreIndex);
+	auto queueSubmitAdditionalSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_QueueSubmitAdditionalSemaphoreIndex);
+	auto imageIndex = VulkanGraphicsResourceSwapchain::GetAcquiredImageIndex();
+
+	std::vector<VkSemaphore> waitSemaphoreArray;
+	{
+		waitSemaphoreArray.push_back(queueSubmitPrimarySemaphore);
+	}
+
+	std::vector<VkPipelineStageFlags> waitDstStageMaskArray;
+	{
+		waitDstStageMaskArray.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+	}
+
+	std::vector<VkCommandBuffer> commandBufferArray;
+	{
+		auto additionalCommandBuffers = m_ResourceCommandBufferMgr.GetAllAdditionalCommandBuffers();
+
+		for (auto commandBuffer : additionalCommandBuffers)
+		{
+			commandBufferArray.push_back(commandBuffer);
+		}
+	}
+
+	std::vector<VkSemaphore> signalSemaphoreArray;
+	{
+		signalSemaphoreArray.push_back(queueSubmitAdditionalSemaphore);
+	}
+
+	auto submitInfo = VkSubmitInfo();
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.pNext = NULL;
+	submitInfo.waitSemaphoreCount = waitSemaphoreArray.size();
+	submitInfo.pWaitSemaphores = waitSemaphoreArray.data();
+	submitInfo.pWaitDstStageMask = waitDstStageMaskArray.data();
+	submitInfo.commandBufferCount = commandBufferArray.size(); // TODO: in the future think about submitting multiple queues simultaneously...
+	submitInfo.pCommandBuffers = commandBufferArray.data();
+	submitInfo.signalSemaphoreCount = signalSemaphoreArray.size();
+	submitInfo.pSignalSemaphores = signalSemaphoreArray.data();
+
+	auto result = vkQueueSubmit(m_ResourceDevice.GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+
+	if (result)
+	{
+		printf_console("[VulkanGraphics] failed to submit a queue with error code %d\n", result);
+
+		throw;
+	}
+}
+
+void VulkanGraphics::PresentFrame()
+{
+	//auto queueSubmitPrimarySemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_QueueSubmitPrimarySemaphoreIndex);
+	auto queueSubmitAdditionalSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_QueueSubmitAdditionalSemaphoreIndex);
+	auto imageIndex = VulkanGraphicsResourceSwapchain::GetAcquiredImageIndex();
+	std::vector<VkSemaphore> waitSemaphoreArray;
+	{
+		//waitSemaphoreArray.push_back(queueSubmitPrimarySemaphore);
+		waitSemaphoreArray.push_back(queueSubmitAdditionalSemaphore);
+	}
 
 	auto presentInfo = VkPresentInfoKHR();
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 	presentInfo.pNext = NULL;
-	presentInfo.waitSemaphoreCount = signalSemaphoreArray.size();
-	presentInfo.pWaitSemaphores = signalSemaphoreArray.data();
+	presentInfo.waitSemaphoreCount = waitSemaphoreArray.size();
+	presentInfo.pWaitSemaphores = waitSemaphoreArray.data();
 	presentInfo.swapchainCount = 1;
 	presentInfo.pSwapchains = &m_ResourceSwapchain.GetSwapchain();
 	presentInfo.pImageIndices = &imageIndex;
 	presentInfo.pResults = NULL;
-	result = vkQueuePresentKHR(m_ResourceDevice.GetGraphicsQueue(), &presentInfo);
+
+	auto result = vkQueuePresentKHR(m_ResourceDevice.GetGraphicsQueue(), &presentInfo);
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR)
 	{
@@ -252,6 +324,44 @@ void VulkanGraphics::DrawFrame()
 
 		throw;
 	}
+}
+
+void VulkanGraphics::BeginRenderPass(const VkCommandBuffer& commandBuffer, int renderPassIndex)
+{
+	uint32_t width, height, imageIndex;
+	m_ResourceSwapchain.GetSwapchainSize(width, height);
+	imageIndex = VulkanGraphicsResourceSwapchain::GetAcquiredImageIndex();
+
+	std::vector<VkClearValue> clearValueArray;
+	{
+		auto clearValue = VkClearValue();
+		clearValue.color = { 0.0f, 0.0f, 1.0f, 1.0f };
+		clearValue.depthStencil.depth = 0.0f;
+		clearValue.depthStencil.stencil = 0;
+		clearValueArray.push_back(clearValue);
+	}
+	{
+		auto clearValue = VkClearValue();
+		clearValue.color = { 0.0f, 0.0f, 0.0f, 0.0f };
+		clearValue.depthStencil.depth = 1.0f;
+		clearValue.depthStencil.stencil = 0;
+		clearValueArray.push_back(clearValue);
+	}
+
+	auto renderPassBegin = VkRenderPassBeginInfo();
+	renderPassBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	renderPassBegin.pNext = NULL;
+	renderPassBegin.renderPass = m_ResourceRenderPassMgr.GetRenderPass(renderPassIndex);
+	renderPassBegin.framebuffer = m_ResourceRenderPassMgr.GetFramebuffer(imageIndex);
+	renderPassBegin.renderArea = { {0, 0}, {width, height} };
+	renderPassBegin.clearValueCount = clearValueArray.size();
+	renderPassBegin.pClearValues = clearValueArray.data();
+	vkCmdBeginRenderPass(commandBuffer, &renderPassBegin, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void VulkanGraphics::EndRenderPass(const VkCommandBuffer& commandBuffer)
+{
+	vkCmdEndRenderPass(commandBuffer);
 }
 
 void VulkanGraphics::BuildRenderLoop()
@@ -376,7 +486,15 @@ void VulkanGraphics::BuildRenderLoop()
 	int pipelineIndex = m_ResourcePipelineMgr.CreateGraphicsPipeline(vertexShaderModuleIndex, fragmentShaderModuleIndex, pipelineLayoutIndex, renderPassIndex, 0);
 	m_ResourcePipelineMgr.EndToCreateGraphicsPipeline();
 
-	int descriptorPoolIndex = m_ResourcePipelineMgr.CreateDescriptorPool();
+	auto poolSizeArray = std::vector<VkDescriptorPoolSize>();
+	{
+		auto poolSize = VkDescriptorPoolSize();
+		poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		poolSize.descriptorCount = 2;
+		poolSizeArray.push_back(poolSize);
+	}
+
+	int descriptorPoolIndex = m_ResourcePipelineMgr.CreateDescriptorPool(poolSizeArray);
 	int descriptorSetIndex = m_ResourcePipelineMgr.AllocateDescriptorSet(descriptorPoolIndex, descSetLayoutArray[0]);
 	m_ResourcePipelineMgr.UpdateDescriptorSet(descriptorSetIndex, 0, m_CharacterHeadTexture.GetImageView(), m_CharacterHeadSampler.GetSampler());
 	m_ResourcePipelineMgr.UpdateDescriptorSet(descriptorSetIndex, 1, m_CharacterBodyTexture.GetImageView(), m_CharacterBodySampler.GetSampler());

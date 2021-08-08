@@ -5,6 +5,17 @@
 class VulkanGraphicsResourcePipelineManager : public VulkanGraphicsResourceBase
 {
 public:
+	static const VkPipelineCache& GetPipelineCache()
+	{
+		return s_PipelineCache;
+	}
+
+	static const VkDescriptorPool& GetDescriptorPool(int index)
+	{
+		return s_DescriptorPoolArray[index];
+	}
+
+public:
 	// TODO: also we need to take care of actual descriptor sets...(NECESSARY!!!)
 
 	static int CreateGfxFence();
@@ -27,7 +38,7 @@ public:
 	static void EndToCreateGraphicsPipeline();
 	static const VkPipeline& GetGraphicsPipeline(int index);
 	static void DestroyGraphicsPipeline(int index);
-	static int CreateDescriptorPool();
+	static int CreateDescriptorPool(const std::vector<VkDescriptorPoolSize>& poolSizeArray);
 	static void DestroyDescriptorPool(int index);
 	static int AllocateDescriptorSet(int poolIndex, int layoutIndex);
 	static void UpdateDescriptorSet(int index, int binding, const VkImageView& imageView, const VkSampler& sampler);
