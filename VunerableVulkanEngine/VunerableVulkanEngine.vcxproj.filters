@@ -16,6 +16,9 @@
     <Filter Include="IMGUI">
       <UniqueIdentifier>{17b4f64d-21f8-4e04-8268-af26390c444d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Editor">
+      <UniqueIdentifier>{ca7fe421-6186-4b66-820f-ee932c51bc83}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="VunerableVulkanEngine.h">
@@ -92,6 +95,12 @@
     </ClInclude>
     <ClInclude Include="IMGUI\imgui_impl_win32.h">
       <Filter>IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="Editor\EditorManager.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Editor\EditorInspector.h">
+      <Filter>Editor</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -175,6 +184,12 @@
     </ClCompile>
     <ClCompile Include="IMGUI\imgui_demo.cpp">
       <Filter>IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="Editor\EditorManager.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Editor\EditorInspector.cpp">
+      <Filter>Editor</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

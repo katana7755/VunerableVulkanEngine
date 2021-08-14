@@ -173,6 +173,8 @@ glslc.exe ../Shaders/Input/coloredtriangle.frag -o ../Shaders/Output/coloredtria
     </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Editor\EditorInspector.h" />
+    <ClInclude Include="Editor\EditorManager.h" />
     <ClInclude Include="Graphics\VulkanGraphics.h" />
     <ClInclude Include="Graphics\VulkanGraphicsObjectBase.h" />
     <ClInclude Include="Graphics\VulkanGraphicsObjectMesh.h" />
@@ -201,6 +203,8 @@ glslc.exe ../Shaders/Input/coloredtriangle.frag -o ../Shaders/Output/coloredtria
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DebugUtility.cpp" />
+    <ClCompile Include="Editor\EditorInspector.cpp" />
+    <ClCompile Include="Editor\EditorManager.cpp" />
     <ClCompile Include="Graphics\VulkanGraphics.cpp" />
     <ClCompile Include="Graphics\VulkanGraphicsObjectBase.cpp" />
     <ClCompile Include="Graphics\VulkanGraphicsObjectMesh.cpp" />
