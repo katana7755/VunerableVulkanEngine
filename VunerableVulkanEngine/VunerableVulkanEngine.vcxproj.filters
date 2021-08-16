@@ -102,6 +102,12 @@
     <ClInclude Include="Editor\EditorInspector.h">
       <Filter>Editor</Filter>
     </ClInclude>
+    <ClInclude Include="Editor\EditorSceneBrowser.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Editor\EditorProjectBrowser.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="VunerableVulkanEngine.cpp">
@@ -189,6 +195,12 @@
       <Filter>Editor</Filter>
     </ClCompile>
     <ClCompile Include="Editor\EditorInspector.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Editor\EditorSceneBrowser.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Editor\EditorProjectBrowser.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
   </ItemGroup>
