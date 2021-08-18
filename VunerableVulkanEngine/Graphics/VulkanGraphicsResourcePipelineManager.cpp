@@ -528,7 +528,7 @@ int VulkanGraphicsResourcePipelineManager::CreateDescriptorPool(const std::vecto
     createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     createInfo.pNext = NULL;
     createInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    createInfo.maxSets = 1;
+    createInfo.maxSets = 2;
     createInfo.poolSizeCount = poolSizeArray.size();
     createInfo.pPoolSizes = poolSizeArray.data();
 

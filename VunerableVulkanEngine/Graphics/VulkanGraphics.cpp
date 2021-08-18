@@ -7,6 +7,9 @@
 #include "../DebugUtility.h"
 #include "glm/gtc/matrix_transform.hpp"
 
+#include "../IMGUI/imgui_impl_vulkan.h"
+#include "../Editor/EditorGameView.h"
+
 const int MAX_COMMAND_BUFFER_COUNT = 1;
 
 VulkanGraphics::VulkanGraphics()
@@ -16,10 +19,19 @@ VulkanGraphics::VulkanGraphics()
 
 VulkanGraphics::~VulkanGraphics()
 {
+	EditorGameView::SetTexture(NULL, NULL);
+
 	vkDeviceWaitIdle(VulkanGraphicsResourceDevice::GetLogicalDevice());
 
 	m_MVPMatrixUniformBuffer.Destroy();
-	m_DepthTexture.Destroy();
+
+	for (auto colorBuffer : m_ColorBufferArray)
+	{
+		colorBuffer.Destroy();
+	}
+
+	m_ColorBufferArray.clear();
+	m_DepthBuffer.Destroy();
 	m_CharacterHeadSampler.Destroy();
 	m_CharacterHeadTexture.Destroy();
 	m_CharacterBodySampler.Destroy();
@@ -51,7 +63,7 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 	m_CharacterHeadSampler.Create();
 	m_CharacterBodyTexture.CreateAsTexture("../PNGs/free_male_1_body_diffuse.png");
 	m_CharacterBodySampler.Create();
-	m_DepthTexture.CreateAsDepthBuffer();
+	m_DepthBuffer.CreateAsDepthBuffer();
 	m_MVPMatrixUniformBuffer.Create();
 
 	m_AcquireNextImageSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
@@ -69,8 +81,17 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 
 void VulkanGraphics::Invalidate()
 {
+	EditorGameView::SetTexture(NULL, NULL);
+
 	m_MVPMatrixUniformBuffer.Destroy();
-	m_DepthTexture.Destroy();
+
+	for (auto colorBuffer : m_ColorBufferArray)
+	{
+		colorBuffer.Destroy();
+	}
+
+	m_ColorBufferArray.clear();
+	m_DepthBuffer.Destroy();
 	m_CharacterHeadSampler.Destroy();
 	m_CharacterHeadTexture.Destroy();
 	m_CharacterBodySampler.Destroy();
@@ -91,7 +112,7 @@ void VulkanGraphics::Invalidate()
 	m_CharacterHeadSampler.Create();
 	m_CharacterBodyTexture.CreateAsTexture("../PNGs/free_male_1_body_diffuse.png");
 	m_CharacterBodySampler.Create();
-	m_DepthTexture.CreateAsDepthBuffer();
+	m_DepthBuffer.CreateAsDepthBuffer();
 	m_MVPMatrixUniformBuffer.Create();
 
 	m_AcquireNextImageSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
@@ -352,7 +373,7 @@ void VulkanGraphics::BeginRenderPass(const VkCommandBuffer& commandBuffer, int r
 	renderPassBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	renderPassBegin.pNext = NULL;
 	renderPassBegin.renderPass = m_ResourceRenderPassMgr.GetRenderPass(renderPassIndex);
-	renderPassBegin.framebuffer = m_ResourceRenderPassMgr.GetFramebuffer(imageIndex);
+	renderPassBegin.framebuffer = m_ResourceRenderPassMgr.GetFramebuffer(m_BackBufferIndexArray[imageIndex]);
 	renderPassBegin.renderArea = { {0, 0}, {width, height} };
 	renderPassBegin.clearValueCount = clearValueArray.size();
 	renderPassBegin.pClearValues = clearValueArray.data();
@@ -362,6 +383,17 @@ void VulkanGraphics::BeginRenderPass(const VkCommandBuffer& commandBuffer, int r
 void VulkanGraphics::EndRenderPass(const VkCommandBuffer& commandBuffer)
 {
 	vkCmdEndRenderPass(commandBuffer);
+}
+
+void VulkanGraphics::DoTest()
+{
+	auto imageInfo = VkDescriptorImageInfo();
+	imageInfo.sampler = m_CharacterHeadSampler.GetSampler();
+	imageInfo.imageView = m_ColorBufferArray[1].GetImageView();
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	auto descriptorSet = ImGui_ImplVulkan_AddTexture(imageInfo);
+	EditorGameView::SetTexture(m_ColorBufferArray[1].GetImage(), descriptorSet);
 }
 
 void VulkanGraphics::BuildRenderLoop()
@@ -379,7 +411,7 @@ void VulkanGraphics::BuildRenderLoop()
 		desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		desc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		desc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		attachmentDescArray.push_back(desc);
 	}
 	{
@@ -457,9 +489,25 @@ void VulkanGraphics::BuildRenderLoop()
 	uint32_t width, height, layers;
 	m_ResourceSwapchain.GetSwapchainSize(width, height);
 
+	m_BackBufferIndexArray.clear();
+
 	for (int i = 0; i < swapchainImageViewCount; ++i)
 	{
-		m_ResourceRenderPassMgr.CreateFramebuffer(renderPassIndex, { m_ResourceSwapchain.GetImageView(i), m_DepthTexture.GetImageView() }, width, height, 1);
+		m_BackBufferIndexArray.push_back(m_ResourceRenderPassMgr.CreateFramebuffer(renderPassIndex, { m_ResourceSwapchain.GetImageView(i), m_DepthBuffer.GetImageView() }, width, height, 1));
+	}
+
+	for (int i = 0; i < 1; ++i)
+	{
+		VulkanGraphicsObjectTexture colorBuffer;
+		colorBuffer.CreateAsColorBuffer();
+		m_ColorBufferArray.push_back(colorBuffer);
+		m_FrontBufferIndexArray.push_back(m_ResourceRenderPassMgr.CreateFramebuffer(renderPassIndex, { colorBuffer.GetImageView(), m_DepthBuffer.GetImageView() }, width, height, 1));
+	}
+
+	{
+		VulkanGraphicsObjectTexture colorBuffer;
+		colorBuffer.CreateAsColorBufferForGUI();
+		m_ColorBufferArray.push_back(colorBuffer);
 	}
 
 	std::vector<int> descSetLayoutArray;
@@ -541,7 +589,8 @@ void VulkanGraphics::BuildRenderLoop()
 		renderPassBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		renderPassBegin.pNext = NULL;
 		renderPassBegin.renderPass = m_ResourceRenderPassMgr.GetRenderPass(renderPassIndex);
-		renderPassBegin.framebuffer = m_ResourceRenderPassMgr.GetFramebuffer(i);
+		//renderPassBegin.framebuffer = m_ResourceRenderPassMgr.GetFramebuffer(m_BackBufferIndexArray[i]);
+		renderPassBegin.framebuffer = m_ResourceRenderPassMgr.GetFramebuffer(m_FrontBufferIndexArray[0]);
 		renderPassBegin.renderArea = { {0, 0}, {width, height} };
 		renderPassBegin.clearValueCount = clearValueArray.size();
 		renderPassBegin.pClearValues = clearValueArray.data();
@@ -554,6 +603,95 @@ void VulkanGraphics::BuildRenderLoop()
 		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, m_ResourcePipelineMgr.GetDescriptorSetArray().size(), m_ResourcePipelineMgr.GetDescriptorSetArray().data(), 0, NULL); // TODO: what is dynamic offset and when do we need it?
 		vkCmdDrawIndexed(commandBuffer, m_CharacterMesh.GetIndexCount(), 1, 0, 0, 0);
 		vkCmdEndRenderPass(commandBuffer);
+
+		auto imageBarrierArray = std::vector<VkImageMemoryBarrier>();
+		{
+			auto imageBarrier = VkImageMemoryBarrier();
+			imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			imageBarrier.pNext = NULL;
+			imageBarrier.srcAccessMask = 0;
+			imageBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			imageBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			imageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+			imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			imageBarrier.image = m_ColorBufferArray[0].GetImage();
+			imageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			imageBarrier.subresourceRange.baseMipLevel = 0;
+			imageBarrier.subresourceRange.levelCount = 1;
+			imageBarrier.subresourceRange.baseArrayLayer = 0;
+			imageBarrier.subresourceRange.layerCount = 1;
+			imageBarrierArray.push_back(imageBarrier);
+		}
+		{
+			auto imageBarrier = VkImageMemoryBarrier();
+			imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			imageBarrier.pNext = NULL;
+			imageBarrier.srcAccessMask = 0;
+			imageBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			imageBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			imageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			imageBarrier.image = m_ColorBufferArray[1].GetImage();
+			imageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			imageBarrier.subresourceRange.baseMipLevel = 0;
+			imageBarrier.subresourceRange.levelCount = 1;
+			imageBarrier.subresourceRange.baseArrayLayer = 0;
+			imageBarrier.subresourceRange.layerCount = 1;
+			imageBarrierArray.push_back(imageBarrier);
+		}
+
+		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, imageBarrierArray.size(), imageBarrierArray.data());
+
+		auto imageRegion = VkImageCopy();
+		imageRegion.srcSubresource = VkImageSubresourceLayers { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+		imageRegion.srcOffset = VkOffset3D { 0, 0, 0 };
+		imageRegion.dstSubresource = VkImageSubresourceLayers { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+		imageRegion.dstOffset = VkOffset3D { 0, 0, 0 };
+		imageRegion.extent = VkExtent3D { width, height, 1 };
+		vkCmdCopyImage(commandBuffer, m_ColorBufferArray[0].GetImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_ColorBufferArray[1].GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageRegion);
+		imageBarrierArray.clear();
+
+		{
+			auto imageBarrier = VkImageMemoryBarrier();
+			imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			imageBarrier.pNext = NULL;
+			imageBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			imageBarrier.dstAccessMask = 0;
+			imageBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+			imageBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			imageBarrier.image = m_ColorBufferArray[0].GetImage();
+			imageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			imageBarrier.subresourceRange.baseMipLevel = 0;
+			imageBarrier.subresourceRange.levelCount = 1;
+			imageBarrier.subresourceRange.baseArrayLayer = 0;
+			imageBarrier.subresourceRange.layerCount = 1;
+			imageBarrierArray.push_back(imageBarrier);
+		}
+		{
+			auto imageBarrier = VkImageMemoryBarrier();
+			imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			imageBarrier.pNext = NULL;
+			imageBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			imageBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			imageBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			imageBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			imageBarrier.image = m_ColorBufferArray[1].GetImage();
+			imageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			imageBarrier.subresourceRange.baseMipLevel = 0;
+			imageBarrier.subresourceRange.levelCount = 1;
+			imageBarrier.subresourceRange.baseArrayLayer = 0;
+			imageBarrier.subresourceRange.layerCount = 1;
+			imageBarrierArray.push_back(imageBarrier);
+		}
+
+		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, imageBarrierArray.size(), imageBarrierArray.data());
+
 		result = vkEndCommandBuffer(commandBuffer);
 
 		if (result)

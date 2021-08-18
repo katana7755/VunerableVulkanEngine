@@ -45,11 +45,11 @@ void InitializeImGui(HWND hWnd)
         desc.flags = 0;
         desc.format = VulkanGraphicsResourceSwapchain::GetSwapchainFormat();
         desc.samples = VK_SAMPLE_COUNT_1_BIT; // TODO: need to be modified when starting to consider msaa...(NECESSARY!!!)
-        desc.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+        desc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        desc.initialLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         desc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
         attachmentDescArray.push_back(desc);
     }
@@ -129,67 +129,67 @@ void InitializeImGui(HWND hWnd)
     {
         auto poolSize = VkDescriptorPoolSize();
         poolSize.type = VK_DESCRIPTOR_TYPE_SAMPLER;
-        poolSize.descriptorCount = 1000;
+        poolSize.descriptorCount = 100;
         poolSizeArray.push_back(poolSize);
     }
     {
         auto poolSize = VkDescriptorPoolSize();
         poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSize.descriptorCount = 1000;
+        poolSize.descriptorCount = 100;
         poolSizeArray.push_back(poolSize);
     }
     {
         auto poolSize = VkDescriptorPoolSize();
         poolSize.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-        poolSize.descriptorCount = 1000;
+        poolSize.descriptorCount = 100;
         poolSizeArray.push_back(poolSize);
     }
     {
         auto poolSize = VkDescriptorPoolSize();
         poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        poolSize.descriptorCount = 1000;
+        poolSize.descriptorCount = 100;
         poolSizeArray.push_back(poolSize);
     }
     {
         auto poolSize = VkDescriptorPoolSize();
         poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
-        poolSize.descriptorCount = 1000;
+        poolSize.descriptorCount = 100;
         poolSizeArray.push_back(poolSize);
     }
     {
         auto poolSize = VkDescriptorPoolSize();
         poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
-        poolSize.descriptorCount = 1000;
+        poolSize.descriptorCount = 100;
         poolSizeArray.push_back(poolSize);
     }
     {
         auto poolSize = VkDescriptorPoolSize();
         poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        poolSize.descriptorCount = 1000;
+        poolSize.descriptorCount = 100;
         poolSizeArray.push_back(poolSize);
     }
     {
         auto poolSize = VkDescriptorPoolSize();
         poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        poolSize.descriptorCount = 1000;
+        poolSize.descriptorCount = 100;
         poolSizeArray.push_back(poolSize);
     }
     {
         auto poolSize = VkDescriptorPoolSize();
         poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-        poolSize.descriptorCount = 1000;
+        poolSize.descriptorCount = 100;
         poolSizeArray.push_back(poolSize);
     }
     {
         auto poolSize = VkDescriptorPoolSize();
         poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-        poolSize.descriptorCount = 1000;
+        poolSize.descriptorCount = 100;
         poolSizeArray.push_back(poolSize);
     }
     {
         auto poolSize = VkDescriptorPoolSize();
         poolSize.type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-        poolSize.descriptorCount = 1000;
+        poolSize.descriptorCount = 100;
         poolSizeArray.push_back(poolSize);
     }
 
@@ -221,6 +221,8 @@ void InitializeImGui(HWND hWnd)
     init_info.CheckVkResultFn = check_vk_result;
     ImGui_ImplVulkan_Init(&init_info, VulkanGraphicsResourceRenderPassManager::GetRenderPass(gImGuiRenderPassIndex)); // TODO: will we need to make an individual render pass?
     gImGuiFontUpdated = false;
+
+    gGraphicsPtr->DoTest();
 }
 
 void DeinitializeImGui()

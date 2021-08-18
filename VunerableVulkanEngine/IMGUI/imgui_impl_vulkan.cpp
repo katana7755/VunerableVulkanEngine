@@ -696,6 +696,58 @@ bool ImGui_ImplVulkan_CreateFontsTexture(VkCommandBuffer command_buffer)
     return true;
 }
 
+VkDescriptorSet s_OldDescriptorSet;
+
+// ***** Test *****
+ImTextureID ImGui_ImplVulkan_AddTexture(VkDescriptorImageInfo descriptor_image_info)
+{
+    VkResult err;
+
+    ImGui_ImplVulkan_Data* bd = ImGui_ImplVulkan_GetBackendData();
+    ImGui_ImplVulkan_InitInfo* v = &bd->VulkanInitInfo;
+    VkDescriptorSet descriptor_set;
+
+    s_OldDescriptorSet = bd->DescriptorSet;
+
+    // Create Descriptor Set:
+    {
+        VkDescriptorSetAllocateInfo alloc_info = {};
+        alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        alloc_info.descriptorPool = v->DescriptorPool;
+        alloc_info.descriptorSetCount = 1;
+        alloc_info.pSetLayouts = &bd->DescriptorSetLayout;
+        err = vkAllocateDescriptorSets(v->Device, &alloc_info, &descriptor_set);
+        check_vk_result(err);
+    }
+
+    // Update the Descriptor Set:
+    {
+        VkDescriptorImageInfo desc_image[1] = {};
+        desc_image[0].sampler = descriptor_image_info.sampler;
+        desc_image[0].imageView = descriptor_image_info.imageView;
+        desc_image[0].imageLayout = descriptor_image_info.imageLayout;
+        VkWriteDescriptorSet write_desc[1] = {};
+        write_desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write_desc[0].dstSet = descriptor_set;
+        write_desc[0].descriptorCount = 1;
+        write_desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        write_desc[0].pImageInfo = desc_image;
+        vkUpdateDescriptorSets(v->Device, 1, write_desc, 0, NULL);
+    }
+
+    return (ImTextureID)descriptor_set;
+}
+
+void ImGui_ImplVulkan_ChangeDescriptorSet(ImTextureID descriptorSet)
+{
+    ImGui_ImplVulkan_GetBackendData()->DescriptorSet = (VkDescriptorSet)descriptorSet;
+}
+
+void ImGui_ImplVulkan_ResetDescriptorSet()
+{
+    ImGui_ImplVulkan_GetBackendData()->DescriptorSet = s_OldDescriptorSet;
+}
+
 static void ImGui_ImplVulkan_CreateShaderModules(VkDevice device, const VkAllocationCallbacks* allocator)
 {
     // Create the shader modules

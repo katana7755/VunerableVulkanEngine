@@ -5,6 +5,18 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
 
+void VulkanGraphicsObjectTexture::CreateAsColorBuffer()
+{
+	m_Format = VulkanGraphicsResourceDevice::GetSurfaceFormatArray()[0].format;
+	m_Width = VulkanGraphicsResourceDevice::GetSurfaceCapabilities().currentExtent.width;
+	m_Height = VulkanGraphicsResourceDevice::GetSurfaceCapabilities().currentExtent.height;
+	m_MipLevel = 1;
+	m_SampleCountBits = VK_SAMPLE_COUNT_1_BIT;
+	m_Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	m_AspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	VulkanGraphicsObjectBase::Create();
+}
+
 void VulkanGraphicsObjectTexture::CreateAsDepthBuffer()
 {
 	m_Format = VK_FORMAT_D32_SFLOAT;
@@ -14,6 +26,18 @@ void VulkanGraphicsObjectTexture::CreateAsDepthBuffer()
 	m_SampleCountBits = VK_SAMPLE_COUNT_1_BIT;
 	m_Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 	m_AspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	VulkanGraphicsObjectBase::Create();
+}
+
+void VulkanGraphicsObjectTexture::CreateAsColorBufferForGUI()
+{
+	m_Format = VulkanGraphicsResourceDevice::GetSurfaceFormatArray()[0].format;
+	m_Width = VulkanGraphicsResourceDevice::GetSurfaceCapabilities().currentExtent.width;
+	m_Height = VulkanGraphicsResourceDevice::GetSurfaceCapabilities().currentExtent.height;
+	m_MipLevel = 1;
+	m_SampleCountBits = VK_SAMPLE_COUNT_1_BIT;
+	m_Usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	m_AspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	VulkanGraphicsObjectBase::Create();
 }
 
@@ -194,6 +218,7 @@ bool VulkanGraphicsObjectTexture::CreateInternal()
 	imageCreateInfo.mipLevels = m_MipLevel;
 	imageCreateInfo.arrayLayers = 1;
 	imageCreateInfo.samples = m_SampleCountBits;
+	imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	imageCreateInfo.usage = m_Usage;
 	imageCreateInfo.queueFamilyIndexCount = 0;

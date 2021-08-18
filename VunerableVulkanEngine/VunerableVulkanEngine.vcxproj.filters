@@ -108,6 +108,9 @@
     <ClInclude Include="Editor\EditorProjectBrowser.h">
       <Filter>Editor</Filter>
     </ClInclude>
+    <ClInclude Include="Editor\EditorGameView.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="VunerableVulkanEngine.cpp">
@@ -201,6 +204,9 @@
       <Filter>Editor</Filter>
     </ClCompile>
     <ClCompile Include="Editor\EditorProjectBrowser.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Editor\EditorGameView.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
   </ItemGroup>

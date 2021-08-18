@@ -9,8 +9,15 @@ public:
 		return m_ImageView;
 	}
 
+	const VkImage& GetImage()
+	{
+		return m_Image;
+	}
+
 	// TODO: need to support MipMap
 	// TODO: need to support MSAA
+	void CreateAsColorBuffer();
+	void CreateAsColorBufferForGUI();
 	void CreateAsDepthBuffer();
 	void CreateAsTexture(const char* strPngPath);
 	bool IsStagingBufferExist() { return m_IsStagingBufferExist; };

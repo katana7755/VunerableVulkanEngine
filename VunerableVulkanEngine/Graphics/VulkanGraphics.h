@@ -31,6 +31,7 @@ public:
 	void PresentFrame();
 	void BeginRenderPass(const VkCommandBuffer& commandBuffer, int renderPassIndex);
 	void EndRenderPass(const VkCommandBuffer& commandBuffer);
+	void DoTest();
 
 private:
 	void BuildRenderLoop();
@@ -48,13 +49,16 @@ private:
 	VulkanGraphicsObjectSampler m_CharacterHeadSampler;
 	VulkanGraphicsObjectTexture m_CharacterBodyTexture;
 	VulkanGraphicsObjectSampler m_CharacterBodySampler;
-	VulkanGraphicsObjectTexture m_DepthTexture;
+	std::vector<VulkanGraphicsObjectTexture> m_ColorBufferArray;
+	VulkanGraphicsObjectTexture m_DepthBuffer;
 	VulkanGraphicsObjectUniformBuffer m_MVPMatrixUniformBuffer;
 
 	int m_AcquireNextImageSemaphoreIndex;
 	int m_QueueSubmitFenceIndex;
 	int m_QueueSubmitPrimarySemaphoreIndex;
 	int m_QueueSubmitAdditionalSemaphoreIndex;
+	std::vector<int> m_BackBufferIndexArray;
+	std::vector<int> m_FrontBufferIndexArray;
 
 private:
 	// TODO: Need to convert this into another object...
