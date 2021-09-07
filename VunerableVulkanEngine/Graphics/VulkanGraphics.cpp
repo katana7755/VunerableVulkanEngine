@@ -10,7 +10,14 @@
 #include "../IMGUI/imgui_impl_vulkan.h"
 #include "../Editor/EditorGameView.h"
 
+#include "VulnerableUploadBufferManager.h"
+#include "VulnerableLayer.h"
+#include "VulkanGraphicsResourceShaderManager.h"
+
 const int MAX_COMMAND_BUFFER_COUNT = 1;
+
+size_t g_VertexShaderIdentifier = -1;
+size_t g_fragmentShaderIdentifier = -1;
 
 VulkanGraphics::VulkanGraphics()
 {
@@ -81,6 +88,19 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 
 void VulkanGraphics::Invalidate()
 {
+	{
+		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::DestroyShader>();
+		commandPtr->m_Identifier = g_VertexShaderIdentifier;
+	}
+
+	{
+		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::DestroyShader>();
+		commandPtr->m_Identifier = g_fragmentShaderIdentifier;
+	}
+
+	VulnerableLayer::ExecuteAllCommands();
+
+
 	EditorGameView::SetTexture(NULL, NULL);
 
 	m_MVPMatrixUniformBuffer.Destroy();
@@ -526,12 +546,27 @@ void VulkanGraphics::BuildRenderLoop()
 		pushConstantRangeArray.push_back(m_ResourcePipelineMgr.CreatePushConstantRange(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushMVPMatrix) + sizeof(mainLightDirection)));
 	}	
 
-	int vertexShaderModuleIndex = m_ResourcePipelineMgr.CreateShaderModule("../Shaders/Output/coloredtriangle_vert.spv");
-	int fragmentShaderModuleIndex = m_ResourcePipelineMgr.CreateShaderModule("../Shaders/Output/coloredtriangle_frag.spv");
+	{
+		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::CreateShader>();
+		commandPtr->m_Identifier = VulkanGraphicsResourceShaderManager::GetInstance().AllocateResource();
+		commandPtr->m_UploadBufferID = VulnerableUploadBufferManager::LoadFromFile("../Shaders/Output/coloredtriangle_vert.spv");
+		g_VertexShaderIdentifier = commandPtr->m_Identifier;
+	}
+
+	{
+		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::CreateShader>();
+		commandPtr->m_Identifier = VulkanGraphicsResourceShaderManager::GetInstance().AllocateResource();
+		commandPtr->m_UploadBufferID = VulnerableUploadBufferManager::LoadFromFile("../Shaders/Output/coloredtriangle_frag.spv");
+		g_fragmentShaderIdentifier = commandPtr->m_Identifier;
+	}
+
+	VulnerableLayer::ExecuteAllCommands();
+	
+
 	int pipelineLayoutIndex = m_ResourcePipelineMgr.CreatePipelineLayout(descSetLayoutArray, pushConstantRangeArray);
 	m_ResourcePipelineMgr.BeginToCreateGraphicsPipeline();
 
-	int pipelineIndex = m_ResourcePipelineMgr.CreateGraphicsPipeline(vertexShaderModuleIndex, fragmentShaderModuleIndex, pipelineLayoutIndex, renderPassIndex, 0);
+	int pipelineIndex = m_ResourcePipelineMgr.CreateGraphicsPipeline(g_VertexShaderIdentifier, g_fragmentShaderIdentifier, pipelineLayoutIndex, renderPassIndex, 0);
 	m_ResourcePipelineMgr.EndToCreateGraphicsPipeline();
 
 	auto poolSizeArray = std::vector<VkDescriptorPoolSize>();
@@ -751,15 +786,4 @@ void VulkanGraphics::DestroyDescriptorSet()
 {
 	vkFreeDescriptorSets(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_DescriptorPool, 1, &m_DescriptorSet);
 	vkDestroyDescriptorPool(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_DescriptorPool, NULL);
-}
-
-void VulkanGraphics::CreateShaderModule()
-{
-	//auto createInfo = VkShaderModuleCreateInfo();
-	//createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	//vkCreateShaderModule(VulkanGraphicsResourceDevice::GetLogicalDevice(), )
-}
-
-void VulkanGraphics::DestroyShaderModule()
-{
 }

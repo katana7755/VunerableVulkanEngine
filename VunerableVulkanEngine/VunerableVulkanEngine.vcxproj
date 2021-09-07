@@ -184,13 +184,17 @@ glslc.exe ../Shaders/Input/coloredtriangle.frag -o ../Shaders/Output/coloredtria
     <ClInclude Include="Graphics\VulkanGraphicsObjectSampler.h" />
     <ClInclude Include="Graphics\VulkanGraphicsObjectTexture.h" />
     <ClInclude Include="Graphics\VulkanGraphicsObjectUniformBuffer.h" />
+    <ClInclude Include="Graphics\VulkanGraphicsResourceBase.h" />
     <ClInclude Include="Graphics\VulkanGraphicsResourceCommandBufferManager.h" />
     <ClInclude Include="Graphics\VulkanGraphicsResourceDevice.h" />
     <ClInclude Include="Graphics\VulkanGraphicsResourceInstance.h" />
     <ClInclude Include="Graphics\VulkanGraphicsResourcePipelineManager.h" />
     <ClInclude Include="Graphics\VulkanGraphicsResourceRenderPassManager.h" />
+    <ClInclude Include="Graphics\VulkanGraphicsResourceShaderManager.h" />
     <ClInclude Include="Graphics\VulkanGraphicsResourceSurface.h" />
     <ClInclude Include="Graphics\VulkanGraphicsResourceSwapchain.h" />
+    <ClInclude Include="Graphics\VulnerableLayer.h" />
+    <ClInclude Include="Graphics\VulnerableUploadBufferManager.h" />
     <ClInclude Include="IMGUI\imconfig.h" />
     <ClInclude Include="IMGUI\imgui.h" />
     <ClInclude Include="IMGUI\imgui_impl_vulkan.h" />
@@ -201,7 +205,6 @@ glslc.exe ../Shaders/Input/coloredtriangle.frag -o ../Shaders/Output/coloredtria
     <ClInclude Include="IMGUI\imstb_truetype.h" />
     <ClInclude Include="Utils\glm\gtx\wrap.hpp" />
     <ClInclude Include="Utils\glm\virtrev\xstream.hpp" />
-    <ClInclude Include="VulkanGraphicsResourceBase.h" />
     <ClInclude Include="VunerableVulkanEngine.h" />
   </ItemGroup>
   <ItemGroup>
@@ -223,8 +226,11 @@ glslc.exe ../Shaders/Input/coloredtriangle.frag -o ../Shaders/Output/coloredtria
     <ClCompile Include="Graphics\VulkanGraphicsResourceInstance.cpp" />
     <ClCompile Include="Graphics\VulkanGraphicsResourcePipelineManager.cpp" />
     <ClCompile Include="Graphics\VulkanGraphicsResourceRenderPassManager.cpp" />
+    <ClCompile Include="Graphics\VulkanGraphicsResourceShaderManager.cpp" />
     <ClCompile Include="Graphics\VulkanGraphicsResourceSurface.cpp" />
     <ClCompile Include="Graphics\VulkanGraphicsResourceSwapchain.cpp" />
+    <ClCompile Include="Graphics\VulnerableLayer.cpp" />
+    <ClCompile Include="Graphics\VulnerableUploadBufferManager.cpp" />
     <ClCompile Include="IMGUI\imgui.cpp" />
     <ClCompile Include="IMGUI\imgui_demo.cpp" />
     <ClCompile Include="IMGUI\imgui_draw.cpp" />

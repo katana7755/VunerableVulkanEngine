@@ -5,21 +5,33 @@
 #include "VulkanGraphicsResourceRenderPassManager.h"
 #include "VulkanGraphicsObjectMesh.h"
 #include <stdio.h>
+#include <unordered_map>
+#include <limits>
+#include "VulkanGraphicsResourceShaderManager.h"
 
 const char* PIPELINE_CACHE_DATA_FILE_NAME = "vkpipeline_cache_data.bin";
 
-VkPipelineCache VulkanGraphicsResourcePipelineManager::s_PipelineCache;
-std::vector<VkFence> VulkanGraphicsResourcePipelineManager::s_GfxFenceArray;
-std::vector<VkSemaphore> VulkanGraphicsResourcePipelineManager::s_GfxSemaphoreArray;
-std::vector<VkDescriptorSetLayout> VulkanGraphicsResourcePipelineManager::s_DescriptorSetLayoutArray;
-std::vector<VkPushConstantRange> VulkanGraphicsResourcePipelineManager::s_PushConstantRangeArray;
-std::vector<VkPipelineLayout> VulkanGraphicsResourcePipelineManager::s_PipelineLayoutArray;
-std::vector<VkShaderModule> VulkanGraphicsResourcePipelineManager::s_ShaderModuleArray;
-std::vector<VkGraphicsPipelineCreateInfo> VulkanGraphicsResourcePipelineManager::s_GraphicsPipelineCreateInfoArray;
-std::vector<VkPipeline> VulkanGraphicsResourcePipelineManager::s_GraphicsPipelineArray;
-std::vector<VkDescriptorPool> VulkanGraphicsResourcePipelineManager::s_DescriptorPoolArray;
-std::vector<int> VulkanGraphicsResourcePipelineManager::s_DescriptorPoolIndexArray;
-std::vector<VkDescriptorSet> VulkanGraphicsResourcePipelineManager::s_DescriptorSetArray;
+VkPipelineCache s_PipelineCache;
+std::vector<VkFence> s_GfxFenceArray;
+std::vector<VkSemaphore> s_GfxSemaphoreArray;
+std::vector<VkDescriptorSetLayout> s_DescriptorSetLayoutArray;
+std::vector<VkPushConstantRange> s_PushConstantRangeArray;
+std::vector<VkPipelineLayout> s_PipelineLayoutArray;
+std::vector<VkGraphicsPipelineCreateInfo> s_GraphicsPipelineCreateInfoArray;
+std::vector<VkPipeline> s_GraphicsPipelineArray;
+std::vector<VkDescriptorPool> s_DescriptorPoolArray;
+std::vector<int> s_DescriptorPoolIndexArray;
+std::vector<VkDescriptorSet> s_DescriptorSetArray;
+
+const VkPipelineCache& VulkanGraphicsResourcePipelineManager::GetPipelineCache()
+{
+    return s_PipelineCache;
+}
+
+const VkDescriptorPool& VulkanGraphicsResourcePipelineManager::GetDescriptorPool(int index)
+{
+    return s_DescriptorPoolArray[index];
+}
 
 int VulkanGraphicsResourcePipelineManager::CreateGfxFence()
 {
@@ -85,53 +97,6 @@ void VulkanGraphicsResourcePipelineManager::DestroyGfxSemaphore(int index)
 {
     vkDestroySemaphore(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_GfxSemaphoreArray[index], NULL);
     s_GfxSemaphoreArray.erase(s_GfxSemaphoreArray.begin() + index);
-}
-
-int VulkanGraphicsResourcePipelineManager::CreateShaderModule(const char* strFileName)
-{
-    FILE* file = fopen(strFileName, "rb");
-
-    if (file == NULL)
-    {
-        printf_console("[VulkanGraphics] failed to open the shader file\n");
-
-        throw;
-    }
-
-    fseek(file, 0, SEEK_END);
-
-    auto byteSize = ftell(file);
-    std::vector<char> codeArray(byteSize);
-    rewind(file);
-    fread(codeArray.data(), 1, byteSize, file);
-    fclose(file);
-
-    auto createInfo = VkShaderModuleCreateInfo();
-    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.pNext = NULL;
-    createInfo.flags = 0;
-    createInfo.codeSize = codeArray.size();
-    createInfo.pCode = reinterpret_cast<const uint32_t*>(codeArray.data());
-
-    auto shaderModule = VkShaderModule();
-    auto result = vkCreateShaderModule(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &shaderModule);
-
-    if (result)
-    {
-        printf_console("[VulkanGraphics] failed to create a shader module with error code %d\n", result);
-
-        throw;
-    }
-
-    s_ShaderModuleArray.push_back(shaderModule);
-
-    return s_ShaderModuleArray.size() - 1;
-}
-
-void VulkanGraphicsResourcePipelineManager::DestroyShaderModule(int index)
-{
-    vkDestroyShaderModule(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_ShaderModuleArray[index], NULL);
-    s_ShaderModuleArray.erase(s_ShaderModuleArray.begin() + index);
 }
 
 // TODO: we need to make this feasible to support variable cases...
@@ -258,7 +223,8 @@ void VulkanGraphicsResourcePipelineManager::BeginToCreateGraphicsPipeline()
     s_GraphicsPipelineCreateInfoArray.clear();
 }
 
-int VulkanGraphicsResourcePipelineManager::CreateGraphicsPipeline(int vertexShaderModuleIndex, int fragmentShaderModuleIndex, int pipelineLayoutIndex, int renderPassIndex, int subPassIndex)
+int VulkanGraphicsResourcePipelineManager::CreateGraphicsPipeline(const size_t vertexShaderIdentifier, const size_t fragmentShaderIdentifier, int pipelineLayoutIndex, int renderPassIndex, int subPassIndex)
+//int VulkanGraphicsResourcePipelineManager::CreateGraphicsPipeline(int vertexShaderModuleIndex, int fragmentShaderModuleIndex, int pipelineLayoutIndex, int renderPassIndex, int subPassIndex)
 {
     VkResult result;
 
@@ -270,7 +236,7 @@ int VulkanGraphicsResourcePipelineManager::CreateGraphicsPipeline(int vertexShad
         stageCreateInfo.pNext = NULL;
         stageCreateInfo.flags = 0;
         stageCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-        stageCreateInfo.module = s_ShaderModuleArray[vertexShaderModuleIndex];
+        stageCreateInfo.module = VulkanGraphicsResourceShaderManager::GetInstance().GetResource(vertexShaderIdentifier);
         stageCreateInfo.pName = "main";
         stageCreateInfo.pSpecializationInfo = NULL; // TODO: find out what this is for...
         shaderStageCreateInfoArray.push_back(stageCreateInfo);
@@ -281,7 +247,7 @@ int VulkanGraphicsResourcePipelineManager::CreateGraphicsPipeline(int vertexShad
         stageCreateInfo.pNext = NULL;
         stageCreateInfo.flags = 0;
         stageCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-        stageCreateInfo.module = s_ShaderModuleArray[fragmentShaderModuleIndex];
+        stageCreateInfo.module = VulkanGraphicsResourceShaderManager::GetInstance().GetResource(fragmentShaderIdentifier);
         stageCreateInfo.pName = "main";
         stageCreateInfo.pSpecializationInfo = NULL; // TODO: find out what this is for...
         shaderStageCreateInfoArray.push_back(stageCreateInfo);
@@ -751,13 +717,6 @@ bool VulkanGraphicsResourcePipelineManager::DestroyInternal()
     }
 
     s_DescriptorPoolArray.clear();
-
-    for (auto shaderModule : s_ShaderModuleArray)
-    {
-        vkDestroyShaderModule(VulkanGraphicsResourceDevice::GetLogicalDevice(), shaderModule, NULL);
-    }
-
-    s_ShaderModuleArray.clear();
 
     for (auto pipeline : s_GraphicsPipelineArray)
     {

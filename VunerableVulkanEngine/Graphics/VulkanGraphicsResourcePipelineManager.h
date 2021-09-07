@@ -5,15 +5,9 @@
 class VulkanGraphicsResourcePipelineManager : public VulkanGraphicsResourceBase
 {
 public:
-	static const VkPipelineCache& GetPipelineCache()
-	{
-		return s_PipelineCache;
-	}
-
-	static const VkDescriptorPool& GetDescriptorPool(int index)
-	{
-		return s_DescriptorPoolArray[index];
-	}
+	static const VkPipelineCache& GetPipelineCache();
+	static const VkDescriptorPool& GetDescriptorPool(int index);
+	static void DestroyShaderModule(const size_t identifier);
 
 public:
 	// TODO: also we need to take care of actual descriptor sets...(NECESSARY!!!)
@@ -24,8 +18,6 @@ public:
 	static int CreateGfxSemaphore();
 	static const VkSemaphore& GetGfxSemaphore(int index);
 	static void DestroyGfxSemaphore(int index);
-	static int CreateShaderModule(const char* strFileName);
-	static void DestroyShaderModule(int index);
 	static int CreateDescriptorSetLayout();
 	static void DestroyDescriptorSetLayout(int index);
 	static int CreatePushConstantRange(VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size);
@@ -34,7 +26,8 @@ public:
 	static const VkPipelineLayout& GetPipelineLayout(int index);
 	static void DestroyPipelineLayout(int index);
 	static void BeginToCreateGraphicsPipeline();
-	static int CreateGraphicsPipeline(int vertexShaderModuleIndex, int fragmentShaderModuleIndex, int pipelineLayoutIndex, int renderPassIndex, int subPassIndex);
+	static int CreateGraphicsPipeline(const size_t vertexShaderIdentifier, const size_t fragmentShaderIdentifier, int pipelineLayoutIndex, int renderPassIndex, int subPassIndex);
+	//static int CreateGraphicsPipeline(int vertexShaderModuleIndex, int fragmentShaderModuleIndex, int pipelineLayoutIndex, int renderPassIndex, int subPassIndex);
 	static void EndToCreateGraphicsPipeline();
 	static const VkPipeline& GetGraphicsPipeline(int index);
 	static void DestroyGraphicsPipeline(int index);
@@ -44,20 +37,6 @@ public:
 	static void UpdateDescriptorSet(int index, int binding, const VkImageView& imageView, const VkSampler& sampler);
 	static void ReleaseDescriptorSet(int index);
 	static const std::vector<VkDescriptorSet>& GetDescriptorSetArray();
-
-private:
-	static VkPipelineCache s_PipelineCache;
-	static std::vector<VkFence> s_GfxFenceArray;
-	static std::vector<VkSemaphore> s_GfxSemaphoreArray;
-	static std::vector<VkShaderModule> s_ShaderModuleArray;
-	static std::vector<VkDescriptorSetLayout> s_DescriptorSetLayoutArray;
-	static std::vector<VkPushConstantRange> s_PushConstantRangeArray;
-	static std::vector<VkPipelineLayout> s_PipelineLayoutArray;
-	static std::vector<VkGraphicsPipelineCreateInfo> s_GraphicsPipelineCreateInfoArray;
-	static std::vector<VkPipeline> s_GraphicsPipelineArray;
-	static std::vector<VkDescriptorPool> s_DescriptorPoolArray;
-	static std::vector<int> s_DescriptorPoolIndexArray;
-	static std::vector<VkDescriptorSet> s_DescriptorSetArray;
 
 protected:
 	virtual bool CreateInternal() override;

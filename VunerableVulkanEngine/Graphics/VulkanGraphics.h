@@ -64,8 +64,6 @@ private:
 	// TODO: Need to convert this into another object...
 	void CreateDescriptorSet();
 	void DestroyDescriptorSet();
-	void CreateShaderModule();
-	void DestroyShaderModule();
 
 	VkDescriptorSetLayout m_DescriptorSetLayout;
 
