@@ -41,9 +41,11 @@ protected:
 
 protected:
 	std::vector<TResource> m_ResourceArray;
+	std::vector<TResourceKey> m_ResourceKeyArray;
+	
 	std::vector<size_t> m_IdentifierArray;
 	std::unordered_map<size_t, size_t> m_IdentifierToIndexMap;
-	std::unordered_map<size_t, size_t> m_IndexToIdentifierMap;
+	std::unordered_multimap<size_t, size_t> m_IndexToIdentifiersMap;
 	size_t m_UpcomingIdentifier;
 };
 
@@ -59,7 +61,7 @@ TResource& VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey
 
 	size_t directIndex = m_IdentifierToIndexMap[identifier];
 
-	if (directIndex < 0 || directIndex >= m_ResourceArray.size())
+	if (directIndex >= m_ResourceArray.size())
 	{
 		printf_console("[VulkanGraphics] invalid try of getting gfx resource with id %d\n", identifier);
 
@@ -104,7 +106,7 @@ void VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey>::Rel
 
 	size_t directIndex = m_IdentifierToIndexMap[identifier];
 
-	if (directIndex >= 0)
+	if (directIndex < m_ResourceArray.size())
 	{
 		printf_console("[VulkanGraphics] invalid try of release gfx resource with id %d\n", identifier);
 
@@ -124,10 +126,22 @@ void VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey>::Rel
 template <typename TResource, typename TInputData, typename TResourceKey>
 void VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey>::CreateResource(const size_t identifier, const TInputData& inputData, const TResourceKey& resourceKey)
 {
-	size_t index = m_ResourceArray.size();
-	m_IdentifierToIndexMap[identifier] = index;
-	m_IndexToIdentifierMap[index] = identifier;
-	m_ResourceArray.push_back(CreateResourcePhysically(inputData));
+	auto iter = std::find(m_ResourceKeyArray.begin(), m_ResourceKeyArray.end(), resourceKey);
+
+	if (iter != m_ResourceKeyArray.end())
+	{
+		size_t index = iter - m_ResourceKeyArray.begin();
+		m_IdentifierToIndexMap[identifier] = index;
+		m_IndexToIdentifiersMap.insert({ index, identifier });
+	}
+	else
+	{
+		size_t index = m_ResourceArray.size();
+		m_IdentifierToIndexMap[identifier] = index;
+		m_IndexToIdentifiersMap.insert({ index, identifier });
+		m_ResourceArray.push_back(CreateResourcePhysically(inputData));
+		m_ResourceKeyArray.push_back(resourceKey);
+	}	
 }
 
 template <typename TResource, typename TInputData, typename TResourceKey>
@@ -142,20 +156,51 @@ void VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey>::Des
 
 	size_t directIndex = m_IdentifierToIndexMap[identifier];
 
-	if (directIndex < 0 || directIndex >= m_ResourceArray.size())
+	if (directIndex >= m_ResourceArray.size())
 	{
 		printf_console("[VulkanGraphics] invalid try of destroying gfx resource with id %d\n", identifier);
 
 		throw;
 	}
 
-	DestroyResourcePhysicially(m_ResourceArray[directIndex]);
+	m_IdentifierToIndexMap[identifier] = -1;
 
-	size_t lastIndex = m_ResourceArray.size() - 1;
-	size_t lastIdentifier = m_IndexToIdentifierMap[lastIndex];
-	m_IdentifierToIndexMap[lastIdentifier] = directIndex;
-	m_ResourceArray[directIndex] = m_ResourceArray[lastIndex];
-	m_ResourceArray.erase(m_ResourceArray.begin() + lastIndex);
+	auto range = m_IndexToIdentifiersMap.equal_range(directIndex);
+	int refCount = 0;
+
+	for (auto iter = range.first; iter != range.second;)
+	{
+		if (iter->second == identifier)
+		{
+			iter = m_IndexToIdentifiersMap.erase(iter);
+		}
+		else
+		{
+			++refCount;
+			++iter;
+		}
+	}
+
+	if (refCount <= 0)
+	{
+		DestroyResourcePhysicially(m_ResourceArray[directIndex]);
+
+		size_t lastIndex = m_ResourceArray.size() - 1;
+
+		if (directIndex != lastIndex)
+		{
+			range = m_IndexToIdentifiersMap.equal_range(lastIndex);
+
+			for (auto iter = range.first; iter != range.second; ++iter)
+			{
+				m_IdentifierToIndexMap[iter->second] = directIndex;
+			}
+
+			m_ResourceArray[directIndex] = m_ResourceArray[lastIndex];
+		}
+
+		m_ResourceArray.erase(m_ResourceArray.begin() + lastIndex);
+	}	
 }
 
 template <class TStruct>
