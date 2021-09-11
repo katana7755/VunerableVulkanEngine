@@ -44,6 +44,7 @@ namespace VulnerableCommand
 	{
 		size_t m_Identifier;
 		int m_UploadBufferID;
+		std::string m_ShaderName;
 
 	private:
 		void Execute() override;

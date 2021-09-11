@@ -1,12 +1,14 @@
 #pragma once
-#include "VulkanGraphicsResourceBase.h"
 
-class VulkanGraphicsResourceShaderManager : public VulkanGraphicsResourceManagerBase<VkShaderModule>
+#include "VulkanGraphicsResourceBase.h"
+#include "VulnerableUploadBufferManager.h"
+
+class VulkanGraphicsResourceShaderManager : public VulkanGraphicsResourceManagerBase<VkShaderModule, size_t, std::string>
 {
 public:
 	static VulkanGraphicsResourceShaderManager& GetInstance();
 
-public:
-	void CreateResourcePhysically(const size_t identifier, const char* data, const unsigned int size) override;
-	void DestroyResourcePhysicially(const size_t identifier) override;
+protected:
+	VkShaderModule CreateResourcePhysically(const size_t& uploadBufferIdentifier) override;
+	void DestroyResourcePhysicially(const VkShaderModule& shaderModule) override;
 };

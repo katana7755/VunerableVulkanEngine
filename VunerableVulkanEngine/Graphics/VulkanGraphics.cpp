@@ -548,15 +548,17 @@ void VulkanGraphics::BuildRenderLoop()
 
 	{
 		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::CreateShader>();
-		commandPtr->m_Identifier = VulkanGraphicsResourceShaderManager::GetInstance().AllocateResource();
+		commandPtr->m_Identifier = VulkanGraphicsResourceShaderManager::GetInstance().AllocateIdentifier();
 		commandPtr->m_UploadBufferID = VulnerableUploadBufferManager::LoadFromFile("../Shaders/Output/coloredtriangle_vert.spv");
+		commandPtr->m_ShaderName = "../Shaders/Output/coloredtriangle_vert.spv";
 		g_VertexShaderIdentifier = commandPtr->m_Identifier;
 	}
 
 	{
 		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::CreateShader>();
-		commandPtr->m_Identifier = VulkanGraphicsResourceShaderManager::GetInstance().AllocateResource();
+		commandPtr->m_Identifier = VulkanGraphicsResourceShaderManager::GetInstance().AllocateIdentifier();
 		commandPtr->m_UploadBufferID = VulnerableUploadBufferManager::LoadFromFile("../Shaders/Output/coloredtriangle_frag.spv");
+		commandPtr->m_ShaderName = "../Shaders/Output/coloredtriangle_frag.spv";
 		g_fragmentShaderIdentifier = commandPtr->m_Identifier;
 	}
 

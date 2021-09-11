@@ -1,5 +1,6 @@
 #include "VulkanGraphicsResourceShaderManager.h"
 #include "VulkanGraphicsResourceDevice.h"
+#include "VulnerableUploadBufferManager.h"
 #include "../DebugUtility.h"
 
 VulkanGraphicsResourceShaderManager g_Instance;
@@ -9,14 +10,16 @@ VulkanGraphicsResourceShaderManager& VulkanGraphicsResourceShaderManager::GetIns
 	return g_Instance;
 }
 
-void VulkanGraphicsResourceShaderManager::CreateResourcePhysically(const size_t identifier, const char* data, const unsigned int size)
+VkShaderModule VulkanGraphicsResourceShaderManager::CreateResourcePhysically(const size_t& uploadBufferIdentifier)
 {
+    auto inputData = VulnerableUploadBufferManager::GetUploadBuffer(uploadBufferIdentifier);
+
     auto createInfo = VkShaderModuleCreateInfo();
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.pNext = NULL;
     createInfo.flags = 0;
-    createInfo.codeSize = size;
-    createInfo.pCode = reinterpret_cast<const uint32_t*>(data);
+    createInfo.codeSize = inputData.m_Size;
+    createInfo.pCode = reinterpret_cast<const uint32_t*>(inputData.m_Data);
 
     auto shaderModule = VkShaderModule();
     auto result = vkCreateShaderModule(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &shaderModule);
@@ -28,12 +31,10 @@ void VulkanGraphicsResourceShaderManager::CreateResourcePhysically(const size_t 
         throw;
     }
 
-    size_t actualIndex = m_IdentifierArray[identifier];
-    m_ResourceArray[actualIndex] = shaderModule;
+    return shaderModule;
 }
 
-void VulkanGraphicsResourceShaderManager::DestroyResourcePhysicially(const size_t identifier)
+void VulkanGraphicsResourceShaderManager::DestroyResourcePhysicially(const VkShaderModule& shaderModule)
 {
-    size_t actualIndex = m_IdentifierArray[identifier];
-    vkDestroyShaderModule(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_ResourceArray[actualIndex], NULL);
+    vkDestroyShaderModule(VulkanGraphicsResourceDevice::GetLogicalDevice(), shaderModule, NULL);
 }

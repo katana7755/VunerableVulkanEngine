@@ -13,14 +13,13 @@ namespace VulnerableCommand
 {
 	void CreateShader::Execute()
 	{
-		auto uploadBuffer = VulnerableUploadBufferManager::GetUploadBuffer(m_UploadBufferID);
-		VulkanGraphicsResourceShaderManager::GetInstance().CreateResourcePhysically(m_Identifier, uploadBuffer.m_Data, uploadBuffer.m_Size);
+		VulkanGraphicsResourceShaderManager::GetInstance().CreateResource(m_Identifier, m_UploadBufferID, m_ShaderName);
 	}
 
 	void DestroyShader::Execute()
 	{
-		VulkanGraphicsResourceShaderManager::GetInstance().DestroyResourcePhysicially(m_Identifier);
-		VulkanGraphicsResourceShaderManager::GetInstance().ReleaseResource(m_Identifier);
+		VulkanGraphicsResourceShaderManager::GetInstance().DestroyResource(m_Identifier);
+		VulkanGraphicsResourceShaderManager::GetInstance().ReleaseIdentifier(m_Identifier);
 	}
 
 	void CreateGraphicsPipeline::Execute()
