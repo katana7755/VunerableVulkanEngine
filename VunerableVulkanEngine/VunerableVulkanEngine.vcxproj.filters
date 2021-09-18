@@ -124,6 +124,12 @@
     <ClInclude Include="Graphics\VulkanGraphicsResourcePipelineCache.h">
       <Filter>Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="Graphics\VulkanGraphicsResourceDescriptorSetLayoutManager.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\VulkanGraphicsResourcePipelineLayoutManager.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="IMGUI\imgui.cpp">
@@ -235,6 +241,12 @@
       <Filter>Graphics</Filter>
     </ClCompile>
     <ClCompile Include="Graphics\VulkanGraphicsResourcePipelineCache.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\VulkanGraphicsResourceDescriptorSetLayoutManager.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\VulkanGraphicsResourcePipelineLayoutManager.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
   </ItemGroup>

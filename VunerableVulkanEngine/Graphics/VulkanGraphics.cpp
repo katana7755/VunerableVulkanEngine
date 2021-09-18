@@ -550,7 +550,14 @@ void VulkanGraphics::BuildRenderLoop()
 		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::CreateShader>();
 		commandPtr->m_Identifier = VulkanGraphicsResourceShaderManager::GetInstance().AllocateIdentifier();
 		commandPtr->m_UploadBufferID = VulnerableUploadBufferManager::LoadFromFile("../Shaders/Output/coloredtriangle_vert.spv");
-		commandPtr->m_ShaderName = "../Shaders/Output/coloredtriangle_vert.spv";
+		commandPtr->m_MetaData.m_Type = EVulkanShaderType::VERTEX;
+		commandPtr->m_MetaData.m_Name = "../Shaders/Output/coloredtriangle_vert.spv";
+		commandPtr->m_MetaData.m_PushConstantOffset = 0;
+		commandPtr->m_MetaData.m_PushConstantSize = 16 + 12; // mat4x4 + vec3
+		commandPtr->m_MetaData.m_VertexInputArray.push_back(EVulkanShaderVertexInput::VECTOR3); // position
+		commandPtr->m_MetaData.m_VertexInputArray.push_back(EVulkanShaderVertexInput::VECTOR2); // uv
+		commandPtr->m_MetaData.m_VertexInputArray.push_back(EVulkanShaderVertexInput::VECTOR3); // normal
+		commandPtr->m_MetaData.m_VertexInputArray.push_back(EVulkanShaderVertexInput::VECTOR1); // material
 		g_VertexShaderIdentifier = commandPtr->m_Identifier;
 	}
 
@@ -558,8 +565,21 @@ void VulkanGraphics::BuildRenderLoop()
 		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::CreateShader>();
 		commandPtr->m_Identifier = VulkanGraphicsResourceShaderManager::GetInstance().AllocateIdentifier();
 		commandPtr->m_UploadBufferID = VulnerableUploadBufferManager::LoadFromFile("../Shaders/Output/coloredtriangle_frag.spv");
-		commandPtr->m_ShaderName = "../Shaders/Output/coloredtriangle_frag.spv";
+		commandPtr->m_MetaData.m_Type = EVulkanShaderType::FRAGMENT;
+		commandPtr->m_MetaData.m_Name = "../Shaders/Output/coloredtriangle_frag.spv";
+		commandPtr->m_MetaData.m_InputBindingArray.push_back(EVulkanShaderBindingResource::TEXTURE2D); // samplerDiffuseHead
+		commandPtr->m_MetaData.m_InputBindingArray.push_back(EVulkanShaderBindingResource::TEXTURE2D); // samplerDiffuseBody
 		g_fragmentShaderIdentifier = commandPtr->m_Identifier;
+	}
+
+	size_t testIdentifier = 0;
+
+	// TODO: still need to handle frame buffer and render pass...
+	{
+		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::CreateGraphicsPipeline>();
+		commandPtr->m_Identifier = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().AllocateIdentifier();
+		commandPtr->m_InputData.m_ShaderIdentifiers[EVulkanShaderType::VERTEX] = g_VertexShaderIdentifier;
+		commandPtr->m_InputData.m_ShaderIdentifiers[EVulkanShaderType::FRAGMENT] = g_fragmentShaderIdentifier;
 	}
 
 	VulnerableLayer::ExecuteAllCommands();

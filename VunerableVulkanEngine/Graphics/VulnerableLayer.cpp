@@ -1,6 +1,5 @@
 #include "VulnerableLayer.h"
 #include "VulnerableUploadBufferManager.h"
-#include "VulkanGraphicsResourceShaderManager.h"
 
 #define COMMAND_QUEUE_COUNT 2
 
@@ -13,7 +12,7 @@ namespace VulnerableCommand
 {
 	void CreateShader::Execute()
 	{
-		VulkanGraphicsResourceShaderManager::GetInstance().CreateResource(m_Identifier, m_UploadBufferID, m_ShaderName);
+		VulkanGraphicsResourceShaderManager::GetInstance().CreateResource(m_Identifier, m_UploadBufferID, m_MetaData);
 	}
 
 	void DestroyShader::Execute()
@@ -24,10 +23,13 @@ namespace VulnerableCommand
 
 	void CreateGraphicsPipeline::Execute()
 	{
+		VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().CreateResource(m_Identifier, m_InputData, m_InputData);
 	}
 
 	void DestroyGraphicsPipeline::Execute()
 	{
+		VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().DestroyResource(m_Identifier);
+		VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().ReleaseIdentifier(m_Identifier);
 	}
 
 	void BeginCommandBuffer::Execute()

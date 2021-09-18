@@ -1,5 +1,7 @@
 #pragma once
 
+#include "VulkanGraphicsResourceGraphicsPipelineManager.h"
+#include "VulkanGraphicsResourceShaderManager.h"
 #include <typeindex>
 #include <unordered_map>
 #include <queue>
@@ -44,7 +46,7 @@ namespace VulnerableCommand
 	{
 		size_t m_Identifier;
 		int m_UploadBufferID;
-		std::string m_ShaderName;
+		VulkanShaderMetaData m_MetaData;
 
 	private:
 		void Execute() override;
@@ -61,6 +63,7 @@ namespace VulnerableCommand
 	struct CreateGraphicsPipeline : public HeaderCommand
 	{
 		size_t m_Identifier;
+		VulkanGraphicsPipelineInputData m_InputData;
 
 	private:
 		void Execute() override;

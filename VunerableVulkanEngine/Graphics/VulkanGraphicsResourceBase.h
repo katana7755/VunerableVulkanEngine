@@ -29,7 +29,8 @@ public:
 	}
 
 public:
-	TResource& GetResource(const size_t identifier);
+	const TResource& GetResource(const size_t identifier);
+	const TResourceKey& GetResourceKey(const size_t identifier);
 	size_t AllocateIdentifier();
 	void ReleaseIdentifier(const size_t identifier);
 	void CreateResource(const size_t identifier, const TInputData& inputData, const TResourceKey& resourceKey);
@@ -50,7 +51,7 @@ protected:
 };
 
 template <typename TResource, typename TInputData, typename TResourceKey>
-TResource& VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey>::GetResource(const size_t identifier)
+const TResource& VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey>::GetResource(const size_t identifier)
 {
 	if (m_IdentifierToIndexMap.find(identifier) == m_IdentifierToIndexMap.end())
 	{
@@ -72,6 +73,28 @@ TResource& VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey
 }
 
 template <typename TResource, typename TInputData, typename TResourceKey>
+const TResourceKey& VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey>::GetResourceKey(const size_t identifier)
+{
+	if (m_IdentifierToIndexMap.find(identifier) == m_IdentifierToIndexMap.end())
+	{
+		printf_console("[VulkanGraphics] invalid try of getting gfx resource key with id %d\n", identifier);
+
+		throw;
+	}
+
+	size_t directIndex = m_IdentifierToIndexMap[identifier];
+
+	if (directIndex >= m_ResourceArray.size())
+	{
+		printf_console("[VulkanGraphics] invalid try of getting gfx resource key with id %d\n", identifier);
+
+		throw;
+	}
+
+	return m_ResourceKeyArray[directIndex];
+}
+
+template <typename TResource, typename TInputData, typename TResourceKey>
 size_t VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey>::AllocateIdentifier()
 {
 	if (m_IdentifierArray.size() >= ((size_t)-1))
@@ -83,7 +106,7 @@ size_t VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey>::A
 
 	size_t identifier = m_UpcomingIdentifier++;
 
-	while (m_IdentifierToIndexMap.find(identifier) != m_IdentifierToIndexMap.end())
+	while (m_IdentifierToIndexMap.find(identifier) != m_IdentifierToIndexMap.end() || identifier == -1)
 	{
 		identifier = m_UpcomingIdentifier++;
 	}
