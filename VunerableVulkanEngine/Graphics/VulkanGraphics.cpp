@@ -13,11 +13,15 @@
 #include "VulnerableUploadBufferManager.h"
 #include "VulnerableLayer.h"
 #include "VulkanGraphicsResourceShaderManager.h"
+#include "VulkanGraphicsResourcePipelineLayoutManager.h"
+#include "VulkanGraphicsResourceGraphicsPipelineManager.h"
+#include "VulkanGraphicsResourceDescriptorSetLayoutManager.h"
 
 const int MAX_COMMAND_BUFFER_COUNT = 1;
 
 size_t g_VertexShaderIdentifier = -1;
 size_t g_fragmentShaderIdentifier = -1;
+size_t g_PipelineIdentifier = -1;
 
 VulkanGraphics::VulkanGraphics()
 {
@@ -88,6 +92,11 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 
 void VulkanGraphics::Invalidate()
 {
+	{
+		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::DestroyGraphicsPipeline>();
+		commandPtr->m_Identifier = g_PipelineIdentifier;
+	}
+
 	{
 		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::DestroyShader>();
 		commandPtr->m_Identifier = g_VertexShaderIdentifier;
@@ -530,10 +539,6 @@ void VulkanGraphics::BuildRenderLoop()
 		m_ColorBufferArray.push_back(colorBuffer);
 	}
 
-	std::vector<int> descSetLayoutArray;
-	{
-		descSetLayoutArray.push_back(m_ResourcePipelineMgr.CreateDescriptorSetLayout());
-	}
 	
 	// TODO: when we have proper scene setting flow, remove this codes and replace with that...
 	glm::mat4x4 modelMatrix = glm::rotate(glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f)), glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
@@ -541,10 +546,7 @@ void VulkanGraphics::BuildRenderLoop()
 	glm::mat4x4 pushProjectionMatrix = glm::perspective(glm::radians(60.0f), (float)width / height, 0.01f, 1000.0f);
 	glm::mat4x4 pushMVPMatrix = pushProjectionMatrix * viewMatrix * modelMatrix;
 	glm::vec3 mainLightDirection = glm::vec3(0.0f, 0.0f, 1.0f);
-	std::vector<int> pushConstantRangeArray;
-	{
-		pushConstantRangeArray.push_back(m_ResourcePipelineMgr.CreatePushConstantRange(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushMVPMatrix) + sizeof(mainLightDirection)));
-	}	
+
 
 	{
 		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::CreateShader>();
@@ -553,7 +555,7 @@ void VulkanGraphics::BuildRenderLoop()
 		commandPtr->m_MetaData.m_Type = EVulkanShaderType::VERTEX;
 		commandPtr->m_MetaData.m_Name = "../Shaders/Output/coloredtriangle_vert.spv";
 		commandPtr->m_MetaData.m_PushConstantOffset = 0;
-		commandPtr->m_MetaData.m_PushConstantSize = 16 + 12; // mat4x4 + vec3
+		commandPtr->m_MetaData.m_PushConstantSize = 64 + 12; // mat4x4 + vec3
 		commandPtr->m_MetaData.m_VertexInputArray.push_back(EVulkanShaderVertexInput::VECTOR3); // position
 		commandPtr->m_MetaData.m_VertexInputArray.push_back(EVulkanShaderVertexInput::VECTOR2); // uv
 		commandPtr->m_MetaData.m_VertexInputArray.push_back(EVulkanShaderVertexInput::VECTOR3); // normal
@@ -578,18 +580,18 @@ void VulkanGraphics::BuildRenderLoop()
 	{
 		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::CreateGraphicsPipeline>();
 		commandPtr->m_Identifier = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().AllocateIdentifier();
+		commandPtr->m_InputData.m_RenderPassIndex = renderPassIndex; // this need to be reworked after modifying the render pass manager
+		commandPtr->m_InputData.m_SubPassIndex = 0; // this need to be reworked after modifying the render pass manager
 		commandPtr->m_InputData.m_ShaderIdentifiers[EVulkanShaderType::VERTEX] = g_VertexShaderIdentifier;
 		commandPtr->m_InputData.m_ShaderIdentifiers[EVulkanShaderType::FRAGMENT] = g_fragmentShaderIdentifier;
+		g_PipelineIdentifier = commandPtr->m_Identifier;
 	}
 
 	VulnerableLayer::ExecuteAllCommands();
-	
 
-	int pipelineLayoutIndex = m_ResourcePipelineMgr.CreatePipelineLayout(descSetLayoutArray, pushConstantRangeArray);
-	m_ResourcePipelineMgr.BeginToCreateGraphicsPipeline();
 
-	int pipelineIndex = m_ResourcePipelineMgr.CreateGraphicsPipeline(g_VertexShaderIdentifier, g_fragmentShaderIdentifier, pipelineLayoutIndex, renderPassIndex, 0);
-	m_ResourcePipelineMgr.EndToCreateGraphicsPipeline();
+	auto pipelineData = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().GetResource(g_PipelineIdentifier);
+	auto descriptorSetLayout = VulkanGraphicsResourceDescriptorSetLayoutManager::GetInstance().GetResource(pipelineData.m_DescriptorSetLayoutIdentifiers[EVulkanShaderType::FRAGMENT]);
 
 	auto poolSizeArray = std::vector<VkDescriptorPoolSize>();
 	{
@@ -600,7 +602,7 @@ void VulkanGraphics::BuildRenderLoop()
 	}
 
 	int descriptorPoolIndex = m_ResourcePipelineMgr.CreateDescriptorPool(poolSizeArray);
-	int descriptorSetIndex = m_ResourcePipelineMgr.AllocateDescriptorSet(descriptorPoolIndex, descSetLayoutArray[0]);
+	int descriptorSetIndex = m_ResourcePipelineMgr.AllocateDescriptorSet(descriptorPoolIndex, descriptorSetLayout);
 	m_ResourcePipelineMgr.UpdateDescriptorSet(descriptorSetIndex, 0, m_CharacterHeadTexture.GetImageView(), m_CharacterHeadSampler.GetSampler());
 	m_ResourcePipelineMgr.UpdateDescriptorSet(descriptorSetIndex, 1, m_CharacterBodyTexture.GetImageView(), m_CharacterBodySampler.GetSampler());
 
@@ -640,8 +642,8 @@ void VulkanGraphics::BuildRenderLoop()
 			clearValueArray.push_back(clearValue);
 		}
 
-		auto pipelineLayout = m_ResourcePipelineMgr.GetPipelineLayout(pipelineLayoutIndex);
-		auto pipeline = m_ResourcePipelineMgr.GetGraphicsPipeline(pipelineIndex);
+		auto pipelineLayout = VulkanGraphicsResourcePipelineLayoutManager::GetInstance().GetResource(pipelineData.m_PipelineLayoutIdentifier);
+		auto pipeline = pipelineData.m_Pipeline;
 		auto renderPassBegin = VkRenderPassBeginInfo();
 		renderPassBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		renderPassBegin.pNext = NULL;

@@ -520,14 +520,14 @@ void VulkanGraphicsResourcePipelineManager::DestroyDescriptorPool(int index)
 }
 
 // TODO: we will implement the function in which we can create any descriptor freely
-int VulkanGraphicsResourcePipelineManager::AllocateDescriptorSet(int poolIndex, int layoutIndex)
+int VulkanGraphicsResourcePipelineManager::AllocateDescriptorSet(int poolIndex, const VkDescriptorSetLayout& descriptorSetLayout)
 {
     auto allocateInfo = VkDescriptorSetAllocateInfo();
     allocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocateInfo.pNext = NULL;
     allocateInfo.descriptorPool = s_DescriptorPoolArray[poolIndex];
     allocateInfo.descriptorSetCount = 1;
-    allocateInfo.pSetLayouts = &s_DescriptorSetLayoutArray[layoutIndex];
+    allocateInfo.pSetLayouts = &descriptorSetLayout;
 
     auto descriptorSet = VkDescriptorSet();
     auto result = vkAllocateDescriptorSets(VulkanGraphicsResourceDevice::GetLogicalDevice(), &allocateInfo, &descriptorSet);

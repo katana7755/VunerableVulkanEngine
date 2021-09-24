@@ -5,6 +5,10 @@
 
 struct VulkanGraphicsPipelineInputData
 {
+	// render pass (this will be changed after a render pass manager comes out
+	int m_RenderPassIndex;
+	uint32_t m_SubPassIndex;
+
 	// shaders
 	size_t m_ShaderIdentifiers[EVulkanShaderType_MAX];
 

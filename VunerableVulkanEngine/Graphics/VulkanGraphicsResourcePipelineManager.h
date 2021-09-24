@@ -33,7 +33,7 @@ public:
 	static void DestroyGraphicsPipeline(int index);
 	static int CreateDescriptorPool(const std::vector<VkDescriptorPoolSize>& poolSizeArray);
 	static void DestroyDescriptorPool(int index);
-	static int AllocateDescriptorSet(int poolIndex, int layoutIndex);
+	static int AllocateDescriptorSet(int poolIndex, const VkDescriptorSetLayout& descriptorSetLayout);
 	static void UpdateDescriptorSet(int index, int binding, const VkImageView& imageView, const VkSampler& sampler);
 	static void ReleaseDescriptorSet(int index);
 	static const std::vector<VkDescriptorSet>& GetDescriptorSetArray();

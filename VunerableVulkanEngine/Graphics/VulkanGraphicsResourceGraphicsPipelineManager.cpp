@@ -5,6 +5,7 @@
 #include "VulkanGraphicsResourceSwapchain.h"
 #include "VulkanGraphicsResourceDescriptorSetLayoutManager.h"
 #include "VulkanGraphicsResourcePipelineLayoutManager.h"
+#include "VulkanGraphicsResourceRenderPassManager.h"
 
 VulkanGraphicsResourceGraphicsPipelineManager g_Instance;
 
@@ -93,30 +94,6 @@ void VulkanGraphicsResourceGraphicsPipelineManager::DestroyResourcePhysicially(c
     }
 }
 
-VkPipelineLayout VulkanGraphicsResourceGraphicsPipelineManager::GeneratePipelineLayout(const VulkanGraphicsPipelineInputData& inputData, const std::vector<VkDescriptorSetLayout>& descriptorSetLayoutArray, const std::vector<VkPushConstantRange>& pushConstantRangeArray)
-{
-    auto createInfo = VkPipelineLayoutCreateInfo();
-    createInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    createInfo.pNext = NULL;
-    createInfo.flags = 0;
-    createInfo.setLayoutCount = descriptorSetLayoutArray.size();
-    createInfo.pSetLayouts = descriptorSetLayoutArray.data();
-    createInfo.pushConstantRangeCount = pushConstantRangeArray.size();
-    createInfo.pPushConstantRanges = pushConstantRangeArray.data();
-
-    auto pipelineLayout = VkPipelineLayout();
-    auto result = vkCreatePipelineLayout(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &pipelineLayout);
-
-    if (result)
-    {
-        printf_console("[VulkanGraphics] failed to create a pipeline layout with error code %d\n", result);
-
-        throw;
-    }
-
-    return pipelineLayout;
-}
-
 VkPipelineShaderStageCreateInfo CreateShaderStageInfo(const size_t& shaderIdentifier)
 {
     auto metaData = VulkanGraphicsResourceShaderManager::GetInstance().GetResourceKey(shaderIdentifier);
@@ -148,10 +125,12 @@ VkGraphicsPipelineCreateInfo VulkanGraphicsResourceGraphicsPipelineManager::Gene
     }
 
     // TODO: need to support multiple vertex buffers...(NECESSARY!!!)
-    std::vector<VkVertexInputBindingDescription> vertexInputBindingDescArray;
+    static std::vector<VkVertexInputBindingDescription> vertexInputBindingDescArray;
+    vertexInputBindingDescArray.clear();
 
     // TODO: need to support more various vertex channel like a vertex color...(NECESSARY!!!)
-    std::vector<VkVertexInputAttributeDescription> vertexInputAttributeDescArray;
+    static std::vector<VkVertexInputAttributeDescription> vertexInputAttributeDescArray;
+    vertexInputAttributeDescArray.clear();
 
     if (inputData.m_ShaderIdentifiers[EVulkanShaderType::VERTEX] != -1)
     {
@@ -367,8 +346,8 @@ VkGraphicsPipelineCreateInfo VulkanGraphicsResourceGraphicsPipelineManager::Gene
     createInfo.pColorBlendState = &colorBlendState;
     createInfo.pDynamicState = NULL; // &dynamicState;
     createInfo.layout = pipelineLayout;
-    //createInfo.renderPass = VulkanGraphicsResourceRenderPassManager::GetRenderPass(renderPassIndex);
-    //createInfo.subpass = (uint32_t)subPassIndex;
+    createInfo.renderPass = VulkanGraphicsResourceRenderPassManager::GetRenderPass(inputData.m_RenderPassIndex);
+    createInfo.subpass = inputData.m_SubPassIndex;
     createInfo.basePipelineHandle = VK_NULL_HANDLE; // TODO: in the future we might need to use this for optimization purpose...
     createInfo.basePipelineIndex = -1; // TODO: in the future we might need to use this for optimization purpose...
 
