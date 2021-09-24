@@ -574,8 +574,6 @@ void VulkanGraphics::BuildRenderLoop()
 		g_fragmentShaderIdentifier = commandPtr->m_Identifier;
 	}
 
-	size_t testIdentifier = 0;
-
 	// TODO: still need to handle frame buffer and render pass...
 	{
 		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::CreateGraphicsPipeline>();
