@@ -194,6 +194,7 @@ glslc.exe ../Shaders/Input/coloredtriangle.frag -o ../Shaders/Output/coloredtria
     <ClInclude Include="Graphics\VulkanGraphicsResourcePipelineLayoutManager.h" />
     <ClInclude Include="Graphics\VulkanGraphicsResourcePipelineManager.h" />
     <ClInclude Include="Graphics\VulkanGraphicsResourceRenderPassManager.h" />
+    <ClInclude Include="Graphics\VulkanGraphicsResourceSemaphoreManager.h" />
     <ClInclude Include="Graphics\VulkanGraphicsResourceShaderManager.h" />
     <ClInclude Include="Graphics\VulkanGraphicsResourceSurface.h" />
     <ClInclude Include="Graphics\VulkanGraphicsResourceSwapchain.h" />
@@ -234,6 +235,7 @@ glslc.exe ../Shaders/Input/coloredtriangle.frag -o ../Shaders/Output/coloredtria
     <ClCompile Include="Graphics\VulkanGraphicsResourcePipelineLayoutManager.cpp" />
     <ClCompile Include="Graphics\VulkanGraphicsResourcePipelineManager.cpp" />
     <ClCompile Include="Graphics\VulkanGraphicsResourceRenderPassManager.cpp" />
+    <ClCompile Include="Graphics\VulkanGraphicsResourceSemaphoreManager.cpp" />
     <ClCompile Include="Graphics\VulkanGraphicsResourceShaderManager.cpp" />
     <ClCompile Include="Graphics\VulkanGraphicsResourceSurface.cpp" />
     <ClCompile Include="Graphics\VulkanGraphicsResourceSwapchain.cpp" />

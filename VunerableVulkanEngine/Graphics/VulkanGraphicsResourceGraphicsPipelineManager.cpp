@@ -19,7 +19,7 @@ VulkanGraphicsPipelineOutputData VulkanGraphicsResourceGraphicsPipelineManager::
     auto outputData = VulkanGraphicsPipelineOutputData();
     auto pipelineLayoutInputData = VulkanPipelineLayoutInputData();
 
-    for (int i = 0; i < EVulkanShaderType_MAX; ++i)
+    for (int i = 0; i < EVulkanShaderType::MAX; ++i)
     {
         if (inputData.m_ShaderIdentifiers[i] == -1)
         {
@@ -64,7 +64,6 @@ VulkanGraphicsPipelineOutputData VulkanGraphicsResourceGraphicsPipelineManager::
 
         throw;
     }
-
     
     return outputData;
 }
@@ -80,7 +79,7 @@ void VulkanGraphicsResourceGraphicsPipelineManager::DestroyResourcePhysicially(c
         VulkanGraphicsResourcePipelineLayoutManager::GetInstance().ReleaseIdentifier(identifier);
     }
 
-    for (int i = 0; i < EVulkanShaderType_MAX; ++i)
+    for (int i = 0; i < EVulkanShaderType::MAX; ++i)
     {
         size_t identifier = outputData.m_DescriptorSetLayoutIdentifiers[i];
 
@@ -114,7 +113,7 @@ VkGraphicsPipelineCreateInfo VulkanGraphicsResourceGraphicsPipelineManager::Gene
     static std::vector<VkPipelineShaderStageCreateInfo> shaderStageCreateInfoArray;
     shaderStageCreateInfoArray.clear();
 
-    for (int i = 0; i < EVulkanShaderType_MAX; ++i)
+    for (int i = 0; i < EVulkanShaderType::MAX; ++i)
     {
         if (inputData.m_ShaderIdentifiers[i] == -1)
         {
@@ -147,7 +146,7 @@ VkGraphicsPipelineCreateInfo VulkanGraphicsResourceGraphicsPipelineManager::Gene
             {
                 auto vertexInput = metaData.m_VertexInputArray[i];
 
-                if (vertexInput <= EVulkanShaderVertexInput_NONE || vertexInput >= EVulkanShaderVertexInput_MAX)
+                if (vertexInput <= EVulkanShaderVertexInput::NONE || vertexInput >= EVulkanShaderVertexInput::MAX)
                 {
                     continue;
                 }

@@ -40,7 +40,7 @@ private:
 	VulkanGraphicsResourceSurface m_ResourceSurface;
 	VulkanGraphicsResourceDevice m_ResourceDevice;
 	VulkanGraphicsResourceSwapchain m_ResourceSwapchain;
-	VulkanGraphicsResourceCommandBufferManager m_ResourceCommandBufferMgr;
+	OldVulkanGraphicsResourceCommandBufferManager m_ResourceCommandBufferMgr;
 	VulkanGraphicsResourceRenderPassManager m_ResourceRenderPassMgr;
 	VulkanGraphicsResourcePipelineManager m_ResourcePipelineMgr;
 

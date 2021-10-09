@@ -1,6 +1,7 @@
 #pragma once
 #include "VulkanGraphicsResourceBase.h"
 #include <vector>
+#include <unordered_map>
 
 class VulkanGraphicsResourceDevice : public VulkanGraphicsResourceBase
 {
@@ -18,6 +19,11 @@ public:
 	static const int& GetTransferQueueFamilyIndex()
 	{
 		return s_TransferQueueFamilyIndex;
+	}
+
+	static const int& GetComputeQueueFamilyIndex()
+	{
+		return s_ComputeQueueFamilyIndex;
 	}
 
 	static const VkPhysicalDevice& GetPhysicalDevice()
@@ -66,17 +72,22 @@ public:
 
 	static const VkQueue& GetGraphicsQueue()
 	{
-		return s_GraphicsQueue;
+		return s_QueueMap[s_GraphicsQueueFamilyIndex];
 	}
 
 	static const VkQueue& GetPresentQueue()
 	{
-		return s_PresentQueue;
+		return s_QueueMap[s_PresentQueueFamilyIndex];
 	}
 
 	static const VkQueue& GetTransferQueue()
 	{
-		return s_TransferQueue;
+		return s_QueueMap[s_TransferQueueFamilyIndex];
+	}
+
+	static const VkQueue& GetComputeQueue()
+	{
+		return s_QueueMap[s_ComputeQueueFamilyIndex];
 	}
 
 private:
@@ -85,14 +96,13 @@ private:
 	static int s_GraphicsQueueFamilyIndex;
 	static int s_PresentQueueFamilyIndex;
 	static int s_TransferQueueFamilyIndex;
+	static int s_ComputeQueueFamilyIndex;
 	static VkDevice s_LogicalDevice;
 	static VkPhysicalDeviceProperties s_PhysicalDeviceProperties;
 	static VkSurfaceCapabilitiesKHR s_SurfaceCapabilities;
 	static std::vector<VkSurfaceFormatKHR> s_SurfaceFormatArray;
 	static VkPhysicalDeviceMemoryProperties s_MemoryProperties;
-	static VkQueue s_GraphicsQueue;
-	static VkQueue s_PresentQueue;
-	static VkQueue s_TransferQueue;
+	static std::unordered_map<int, VkQueue> s_QueueMap;
 
 protected:
 	virtual bool CreateInternal() override;
@@ -102,5 +112,6 @@ private:
 	bool EnumeratePhysicalDevices();
 	bool CreateLogicalDevice();
 	bool DestroyLogicalDevice();
+	void GetDeviceQueueOnlyIfNotExist(int queueFamilyIndex);
 };
 

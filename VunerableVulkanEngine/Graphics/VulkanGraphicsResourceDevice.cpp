@@ -2,20 +2,20 @@
 #include "../DebugUtility.h"
 #include "VulkanGraphicsResourceInstance.h"
 #include "VulkanGraphicsResourceSurface.h"
+#include <set>
 
 std::vector<VkPhysicalDevice> VulkanGraphicsResourceDevice::s_PhysicalDeviceArray; // TODO: Think about removing this because it seems redundant...
 int VulkanGraphicsResourceDevice::s_PhysicalDeviceIndex = -1;
 int VulkanGraphicsResourceDevice::s_GraphicsQueueFamilyIndex = -1;
 int VulkanGraphicsResourceDevice::s_PresentQueueFamilyIndex = -1;
 int VulkanGraphicsResourceDevice::s_TransferQueueFamilyIndex = -1;
+int VulkanGraphicsResourceDevice::s_ComputeQueueFamilyIndex = -1;
 VkDevice VulkanGraphicsResourceDevice::s_LogicalDevice;
 VkPhysicalDeviceProperties VulkanGraphicsResourceDevice::s_PhysicalDeviceProperties;
 VkSurfaceCapabilitiesKHR VulkanGraphicsResourceDevice::s_SurfaceCapabilities;
 std::vector<VkSurfaceFormatKHR> VulkanGraphicsResourceDevice::s_SurfaceFormatArray;
 VkPhysicalDeviceMemoryProperties VulkanGraphicsResourceDevice::s_MemoryProperties;
-VkQueue VulkanGraphicsResourceDevice::s_GraphicsQueue;
-VkQueue VulkanGraphicsResourceDevice::s_PresentQueue;
-VkQueue VulkanGraphicsResourceDevice::s_TransferQueue;
+std::unordered_map<int, VkQueue> VulkanGraphicsResourceDevice::s_QueueMap;
 
 bool VulkanGraphicsResourceDevice::CreateInternal()
 {
@@ -60,6 +60,43 @@ public:
 	int _GraphicsQueueFamilyIndex = -1;
 	int _PresentQueueFamilyIndex = -1;
 	int _TransferQueueFamilyIndex = -1;
+	int _ComputeQueueFamilyIndex = -1;
+
+	void TryToSetGraphicsQueueFamilyIndex(int& outputIndex)
+	{
+		TryToSetQueueFamilyIndex(_GraphicsQueueFamilyIndex, (_PresentQueueFamilyIndex < 0) && (_TransferQueueFamilyIndex < 0) && (_ComputeQueueFamilyIndex < 0), outputIndex);
+	}
+
+	void TryToSetPresentQueueFamilyIndex(int& outputIndex)
+	{
+		TryToSetQueueFamilyIndex(_PresentQueueFamilyIndex, (_GraphicsQueueFamilyIndex < 0) && (_TransferQueueFamilyIndex < 0) && (_ComputeQueueFamilyIndex < 0), outputIndex);
+	}
+
+	void TryToSetTransferQueueFamilyIndex(int& outputIndex)
+	{
+		TryToSetQueueFamilyIndex(_TransferQueueFamilyIndex, (_GraphicsQueueFamilyIndex < 0) && (_PresentQueueFamilyIndex < 0) && (_ComputeQueueFamilyIndex < 0), outputIndex);
+	}
+
+	void TryToSetComputeQueueFamilyIndex(int& outputIndex)
+	{
+		TryToSetQueueFamilyIndex(_ComputeQueueFamilyIndex, (_GraphicsQueueFamilyIndex < 0) && (_PresentQueueFamilyIndex < 0) && (_TransferQueueFamilyIndex < 0), outputIndex);
+	}
+
+private:
+	void TryToSetQueueFamilyIndex(const int& mainIndex, const bool& areAllOtherIndicesNull, int& outputIndex)
+	{
+		if (mainIndex < 0)
+		{
+			return;
+		}
+
+		if (outputIndex > 0 && !areAllOtherIndicesNull)
+		{
+			return;
+		}
+
+		outputIndex = mainIndex;
+	}
 };
 
 bool VulkanGraphicsResourceDevice::CreateLogicalDevice()
@@ -101,6 +138,12 @@ bool VulkanGraphicsResourceDevice::CreateLogicalDevice()
 				isPassed = true;
 			}
 
+			if (queueFamilyPropertiesArray[j].queueFlags & VK_QUEUE_COMPUTE_BIT)
+			{
+				option._ComputeQueueFamilyIndex = j;
+				isPassed = true;
+			}
+
 			if (queueFamilyPropertiesArray[j].queueFlags & VK_QUEUE_TRANSFER_BIT)
 			{
 				option._TransferQueueFamilyIndex = j;
@@ -134,34 +177,13 @@ bool VulkanGraphicsResourceDevice::CreateLogicalDevice()
 
 		for (int j = 0; j < potentialOptions.size(); ++j)
 		{
-			if (potentialOptions[j]._GraphicsQueueFamilyIndex != -1 && potentialOptions[j]._PresentQueueFamilyIndex != -1)
-			{
-				s_GraphicsQueueFamilyIndex = potentialOptions[j]._GraphicsQueueFamilyIndex;
-				s_PresentQueueFamilyIndex = potentialOptions[j]._PresentQueueFamilyIndex;
-			}
-
-			if (potentialOptions[j]._GraphicsQueueFamilyIndex == -1 && potentialOptions[j]._TransferQueueFamilyIndex != -1)
-			{
-				s_TransferQueueFamilyIndex = potentialOptions[j]._TransferQueueFamilyIndex;
-			}
-
-			if (s_GraphicsQueueFamilyIndex == -1 && potentialOptions[j]._GraphicsQueueFamilyIndex != -1)
-			{
-				s_GraphicsQueueFamilyIndex = potentialOptions[j]._GraphicsQueueFamilyIndex;
-			}
-
-			if (s_PresentQueueFamilyIndex == -1 && potentialOptions[j]._PresentQueueFamilyIndex != -1)
-			{
-				s_PresentQueueFamilyIndex = potentialOptions[j]._PresentQueueFamilyIndex;
-			}
-
-			if (s_TransferQueueFamilyIndex == -1 && potentialOptions[j]._TransferQueueFamilyIndex != -1)
-			{
-				s_TransferQueueFamilyIndex = potentialOptions[j]._TransferQueueFamilyIndex;
-			}
+			potentialOptions[j].TryToSetGraphicsQueueFamilyIndex(s_GraphicsQueueFamilyIndex);
+			potentialOptions[j].TryToSetPresentQueueFamilyIndex(s_PresentQueueFamilyIndex);
+			potentialOptions[j].TryToSetTransferQueueFamilyIndex(s_TransferQueueFamilyIndex);
+			potentialOptions[j].TryToSetComputeQueueFamilyIndex(s_ComputeQueueFamilyIndex);
 		}
 
-		if (s_GraphicsQueueFamilyIndex == -1 || s_PresentQueueFamilyIndex == -1 || s_TransferQueueFamilyIndex == -1)
+		if (s_GraphicsQueueFamilyIndex == -1 || s_PresentQueueFamilyIndex == -1 || s_TransferQueueFamilyIndex == -1 || s_ComputeQueueFamilyIndex == -1)
 		{
 			continue;
 		}
@@ -176,16 +198,28 @@ bool VulkanGraphicsResourceDevice::CreateLogicalDevice()
 		queueCreateInfo.queueFamilyIndex = s_GraphicsQueueFamilyIndex;
 		queueCreateInfoArray.push_back(queueCreateInfo);
 
-		if (s_PresentQueueFamilyIndex != s_GraphicsQueueFamilyIndex)
+		auto queueSet = std::set<int>();
+		queueSet.insert(s_GraphicsQueueFamilyIndex);
+
+		if (queueSet.find(s_PresentQueueFamilyIndex) == queueSet.end())
 		{
 			queueCreateInfo.queueFamilyIndex = s_PresentQueueFamilyIndex;
 			queueCreateInfoArray.push_back(queueCreateInfo);
+			queueSet.insert(s_PresentQueueFamilyIndex);
 		}
 
-		if (s_TransferQueueFamilyIndex != s_GraphicsQueueFamilyIndex && s_TransferQueueFamilyIndex != s_PresentQueueFamilyIndex)
+		if (queueSet.find(s_TransferQueueFamilyIndex) == queueSet.end())
 		{
 			queueCreateInfo.queueFamilyIndex = s_TransferQueueFamilyIndex;
 			queueCreateInfoArray.push_back(queueCreateInfo);
+			queueSet.insert(s_TransferQueueFamilyIndex);
+		}
+
+		if (queueSet.find(s_ComputeQueueFamilyIndex) == queueSet.end())
+		{
+			queueCreateInfo.queueFamilyIndex = s_ComputeQueueFamilyIndex;
+			queueCreateInfoArray.push_back(queueCreateInfo);
+			queueSet.insert(s_ComputeQueueFamilyIndex);
 		}
 
 		auto extensionNameArray = std::vector<const char*>();
@@ -258,13 +292,17 @@ bool VulkanGraphicsResourceDevice::CreateLogicalDevice()
 			printf_console("\t+++++++++++++++ memoryHeap: %d\n", s_MemoryProperties.memoryHeaps[j]);
 		}
 
-		vkGetDeviceQueue(s_LogicalDevice, s_GraphicsQueueFamilyIndex, 0, &s_GraphicsQueue);
-		vkGetDeviceQueue(s_LogicalDevice, s_PresentQueueFamilyIndex, 0, &s_PresentQueue);
-		vkGetDeviceQueue(s_LogicalDevice, s_TransferQueueFamilyIndex, 0, &s_TransferQueue);
+		s_QueueMap.clear();
+		GetDeviceQueueOnlyIfNotExist(s_GraphicsQueueFamilyIndex);
+		GetDeviceQueueOnlyIfNotExist(s_PresentQueueFamilyIndex);
+		GetDeviceQueueOnlyIfNotExist(s_TransferQueueFamilyIndex);
+		GetDeviceQueueOnlyIfNotExist(s_ComputeQueueFamilyIndex);
+
 		return true;
 	}
 
 	printf_console("[VulkanGraphics] failed to create a logical device\n");
+
 	return false;
 }
 
@@ -275,4 +313,16 @@ bool VulkanGraphicsResourceDevice::DestroyLogicalDevice()
 	s_GraphicsQueueFamilyIndex = -1;
 	s_PresentQueueFamilyIndex = -1;
 	return true;
+}
+
+void VulkanGraphicsResourceDevice::GetDeviceQueueOnlyIfNotExist(int queueFamilyIndex)
+{
+	if (s_QueueMap.find(queueFamilyIndex) != s_QueueMap.end())
+	{
+		return;
+	}
+
+	auto newQueue = VkQueue();
+	vkGetDeviceQueue(s_LogicalDevice, queueFamilyIndex, 0, &newQueue);
+	s_QueueMap[queueFamilyIndex] = newQueue;
 }

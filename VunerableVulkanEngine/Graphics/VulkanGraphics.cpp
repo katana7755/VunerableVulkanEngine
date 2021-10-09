@@ -34,6 +34,8 @@ VulkanGraphics::~VulkanGraphics()
 
 	vkDeviceWaitIdle(VulkanGraphicsResourceDevice::GetLogicalDevice());
 
+	VulnerableLayer::Deinitialize();
+
 	m_MVPMatrixUniformBuffer.Destroy();
 
 	for (auto colorBuffer : m_ColorBufferArray)
@@ -85,6 +87,8 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 	char buffer[1024];
 	GetCurrentDirectory(1024, buffer);
 	printf_console("[VulkanGraphics] ***** current directory is ... %s\n", buffer);
+
+	VulnerableLayer::Initialize();
 
 	BuildRenderLoop();
 }

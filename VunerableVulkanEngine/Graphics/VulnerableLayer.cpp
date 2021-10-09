@@ -36,10 +36,6 @@ namespace VulnerableCommand
 	{
 	}
 
-	void CmdBindGraphicsPipeline::Execute()
-	{
-	}
-
 	void EndCommandBuffer::Execute()
 	{
 	}
@@ -67,6 +63,8 @@ void VulnerableLayer::IncrementCurrentCommandQueueIndex()
 
 void VulnerableLayer::Initialize()
 {
+	VulkanGraphicsResourceCommandBufferManager::GetInstance().Initialize();
+
 	// TODO: we might need to consider to reserve pool size?
 }
 
@@ -97,6 +95,8 @@ void VulnerableLayer::Deinitialize()
 	}
 
 	g_CommandPool.clear();
+
+	VulkanGraphicsResourceCommandBufferManager::GetInstance().Deinitialize();
 }
 
 void VulnerableLayer::ExecuteAllCommands()
@@ -116,6 +116,7 @@ void VulnerableLayer::ExecuteAllCommands()
 		g_CommandPool.insert(CommandPoolType::value_type(typeIndex, commandPtr));
 	}
 
+	// TODO: when we consider multithreaded command buffer recording, dequeue a group from begin to end of command buffer
 	while (!bodyCommandQueue.empty())
 	{
 		auto commandPtr = bodyCommandQueue.front();

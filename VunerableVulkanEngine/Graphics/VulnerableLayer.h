@@ -2,6 +2,7 @@
 
 #include "VulkanGraphicsResourceGraphicsPipelineManager.h"
 #include "VulkanGraphicsResourceShaderManager.h"
+#include "VulkanGraphicsResourceCommandBufferManager.h"
 #include <typeindex>
 #include <unordered_map>
 #include <queue>
@@ -29,9 +30,10 @@ namespace VulnerableCommand
 	struct CommandBase
 	{
 		friend class VulnerableLayer;
+		friend class VulkanGraphicsResourceCommandBufferManager;
 
 	private:
-		virtual void Execute() = 0;
+		virtual void Execute() {};
 	};
 
 	struct HeaderCommand : CommandBase
@@ -79,14 +81,6 @@ namespace VulnerableCommand
 
 	struct BeginCommandBuffer : public BodyCommand
 	{
-	private:
-		void Execute() override;
-	};
-
-	struct CmdBindGraphicsPipeline : public BodyCommand
-	{
-		size_t m_Identifier;
-
 	private:
 		void Execute() override;
 	};

@@ -3,45 +3,54 @@
 #include "VulkanGraphicsResourceBase.h"
 #include <vector>
 
-enum EVulkanShaderType
+namespace EVulkanShaderType
 {
-	EVulkanShaderType_NONE = -1,
+	enum TYPE
+	{
+		NONE = -1,
 
-	VERTEX,
-	FRAGMENT,
+		VERTEX,
+		FRAGMENT,
 
-	EVulkanShaderType_MAX,
+		MAX,
+	};
+}
+
+namespace EVulkanShaderBindingResource
+{
+	enum TYPE
+	{
+		NONE = -1,
+
+		TEXTURE2D,
+
+		MAX,
+	};
 };
 
-enum EVulkanShaderBindingResource
+namespace EVulkanShaderVertexInput
 {
-	EVulkanShaderBindingResource_NONE = -1,
+	enum TYPE
+	{
+		NONE = -1,
 
-	TEXTURE2D,
+		VECTOR1,
+		VECTOR2,
+		VECTOR3,
+		VECTOR4,
 
-	EVulkanShaderBindingResource_MAX,
-};
-
-enum EVulkanShaderVertexInput
-{
-	EVulkanShaderVertexInput_NONE = -1,
-
-	VECTOR1,
-	VECTOR2,
-	VECTOR3,
-	VECTOR4,
-
-	EVulkanShaderVertexInput_MAX
+		MAX
+	};
 };
 
 struct VulkanShaderMetaData
 {
-	EVulkanShaderType m_Type;
+	EVulkanShaderType::TYPE m_Type;
 	std::string m_Name;
-	std::vector<EVulkanShaderBindingResource> m_InputBindingArray;
+	std::vector<EVulkanShaderBindingResource::TYPE> m_InputBindingArray;
 	size_t m_PushConstantOffset;
 	size_t m_PushConstantSize;
-	std::vector<EVulkanShaderVertexInput> m_VertexInputArray; // only for vertex shader...support only 1 binding
+	std::vector<EVulkanShaderVertexInput::TYPE> m_VertexInputArray; // only for vertex shader...support only 1 binding
 
 	bool operator==(const VulkanShaderMetaData& rhs)
 	{
@@ -55,12 +64,7 @@ struct VulkanShaderMetaData
 			return false;
 		}
 
-		if (m_InputBindingArray.size() != rhs.m_InputBindingArray.size())
-		{
-			return false;
-		}
-
-		if (memcmp(m_InputBindingArray.data(), rhs.m_InputBindingArray.data(), sizeof(EVulkanShaderBindingResource) * m_InputBindingArray.size()))
+		if (memcmp(m_InputBindingArray.data(), rhs.m_InputBindingArray.data(), sizeof(EVulkanShaderBindingResource::TYPE) * m_InputBindingArray.size()) != 0)
 		{
 			return false;
 		}
@@ -75,12 +79,8 @@ struct VulkanShaderMetaData
 			return false;
 		}
 
-		if (m_VertexInputArray.size() != rhs.m_VertexInputArray.size())
-		{
-			return false;
-		}
 
-		if (memcmp(m_VertexInputArray.data(), rhs.m_VertexInputArray.data(), sizeof(EVulkanShaderVertexInput) * m_VertexInputArray.size()))
+		if (memcmp(m_VertexInputArray.data(), rhs.m_VertexInputArray.data(), sizeof(EVulkanShaderVertexInput::TYPE) * m_VertexInputArray.size()))
 		{
 			return false;
 		}
@@ -108,7 +108,7 @@ struct VulkanShaderMetaData
 
 		for (auto inputBinding : m_InputBindingArray)
 		{
-			if (inputBinding > EVulkanShaderBindingResource_NONE && inputBinding < EVulkanShaderBindingResource_MAX)
+			if (inputBinding > EVulkanShaderBindingResource::NONE && inputBinding < EVulkanShaderBindingResource::MAX)
 			{
 				flag = true;
 				break;
@@ -134,7 +134,7 @@ struct VulkanShaderMetaData
 
 		for (auto vertexInput : m_VertexInputArray)
 		{
-			if (vertexInput <= EVulkanShaderVertexInput_NONE || vertexInput >= EVulkanShaderVertexInput_MAX)
+			if (vertexInput <= EVulkanShaderVertexInput::NONE || vertexInput >= EVulkanShaderVertexInput::MAX)
 			{
 				continue;
 			}

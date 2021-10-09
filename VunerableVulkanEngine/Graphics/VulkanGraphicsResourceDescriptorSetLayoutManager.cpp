@@ -17,7 +17,7 @@ VkDescriptorSetLayout VulkanGraphicsResourceDescriptorSetLayoutManager::CreateRe
     {
         auto inputBinding = shaderMetaData.m_InputBindingArray[i];
 
-        if (inputBinding == EVulkanShaderBindingResource_NONE)
+        if (inputBinding == EVulkanShaderBindingResource::NONE)
         {
             continue;
         }

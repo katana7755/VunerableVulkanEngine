@@ -246,7 +246,7 @@ void DrawImGuiFrame()
         gImGuiFontUpdated = true;
 
         // Use any command queue
-        auto command_buffer = VulkanGraphicsResourceCommandBufferManager::AllocateAdditionalCommandBuffer();
+        auto command_buffer = OldVulkanGraphicsResourceCommandBufferManager::AllocateAdditionalCommandBuffer();
         VkCommandBufferBeginInfo begin_info = {};
         begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         begin_info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -267,7 +267,7 @@ void DrawImGuiFrame()
         err = vkDeviceWaitIdle(VulkanGraphicsResourceDevice::GetLogicalDevice());
         check_vk_result(err);
         ImGui_ImplVulkan_DestroyFontUploadObjects();
-        VulkanGraphicsResourceCommandBufferManager::ClearAdditionalCommandBuffers();
+        OldVulkanGraphicsResourceCommandBufferManager::ClearAdditionalCommandBuffers();
     }
 
     // Start the Dear ImGui frame
@@ -283,7 +283,7 @@ void DrawImGuiFrame()
 
     if (!is_minimized)
     {
-        auto command_buffer = VulkanGraphicsResourceCommandBufferManager::AllocateAdditionalCommandBuffer();
+        auto command_buffer = OldVulkanGraphicsResourceCommandBufferManager::AllocateAdditionalCommandBuffer();
         VkCommandBufferBeginInfo begin_info = {};
         begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         begin_info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;

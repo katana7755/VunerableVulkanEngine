@@ -10,18 +10,18 @@ struct VulkanGraphicsPipelineInputData
 	uint32_t m_SubPassIndex;
 
 	// shaders
-	size_t m_ShaderIdentifiers[EVulkanShaderType_MAX];
+	size_t m_ShaderIdentifiers[EVulkanShaderType::MAX];
 
 	// properties for the fixed pipeline
 
 	VulkanGraphicsPipelineInputData()
 	{
-		memset(m_ShaderIdentifiers, -1, EVulkanShaderType_MAX);
+		memset(m_ShaderIdentifiers, -1, EVulkanShaderType::MAX);
 	}
 
 	bool operator==(const VulkanGraphicsPipelineInputData& rhs)
 	{
-		if (memcmp(m_ShaderIdentifiers, &rhs.m_ShaderIdentifiers, sizeof(size_t) * EVulkanShaderType_MAX) != 0)
+		if (memcmp(m_ShaderIdentifiers, &rhs.m_ShaderIdentifiers, sizeof(size_t) * EVulkanShaderType::MAX) != 0)
 		{
 			return false;
 		}
@@ -32,13 +32,13 @@ struct VulkanGraphicsPipelineInputData
 
 struct VulkanGraphicsPipelineOutputData
 {
-	size_t m_DescriptorSetLayoutIdentifiers[EVulkanShaderType_MAX];
+	size_t m_DescriptorSetLayoutIdentifiers[EVulkanShaderType::MAX];
 	size_t m_PipelineLayoutIdentifier;
 	VkPipeline m_Pipeline;
 
 	VulkanGraphicsPipelineOutputData()
 	{
-		memset(m_DescriptorSetLayoutIdentifiers, -1, EVulkanShaderType_MAX);
+		memset(m_DescriptorSetLayoutIdentifiers, -1, EVulkanShaderType::MAX);
 		m_PipelineLayoutIdentifier = -1;
 	}
 };

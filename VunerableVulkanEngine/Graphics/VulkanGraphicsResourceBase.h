@@ -35,6 +35,11 @@ public:
 	void ReleaseIdentifier(const size_t identifier);
 	void CreateResource(const size_t identifier, const TInputData& inputData, const TResourceKey& resourceKey);
 	void DestroyResource(const size_t identifier);
+	void DestroyResourceByDirectIndex(const size_t index);
+
+public:
+	virtual void Initialize() {};
+	virtual void Deinitialize() {};
 
 protected:
 	virtual TResource CreateResourcePhysically(const TInputData& inputData) { return TResource(); };
@@ -120,20 +125,16 @@ size_t VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey>::A
 template <typename TResource, typename TInputData, typename TResourceKey>
 void VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey>::ReleaseIdentifier(const size_t identifier)
 {
-	if (m_IdentifierToIndexMap.find(identifier) == m_IdentifierToIndexMap.end())
+	if (m_IdentifierToIndexMap.find(identifier) != m_IdentifierToIndexMap.end())
 	{
-		printf_console("[VulkanGraphics] invalid try of release gfx resource with id %d\n", identifier);
+		if (m_IdentifierToIndexMap[identifier] != (size_t)-1)
+		{
+			printf_console("[VulkanGraphics] failed to release identifier %d\n", identifier);
 
-		throw;
-	}
+			throw;
+		}
 
-	size_t directIndex = m_IdentifierToIndexMap[identifier];
-
-	if (directIndex < m_ResourceArray.size())
-	{
-		printf_console("[VulkanGraphics] invalid try of release gfx resource with id %d\n", identifier);
-
-		throw;
+		m_IdentifierToIndexMap.erase(identifier);
 	}
 
 	auto iter = std::find(m_IdentifierArray.begin(), m_IdentifierArray.end(), identifier);
@@ -142,8 +143,6 @@ void VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey>::Rel
 	{
 		m_IdentifierArray.erase(iter);
 	}
-
-	m_IdentifierToIndexMap.erase(identifier);
 }
 
 template <typename TResource, typename TInputData, typename TResourceKey>
@@ -186,7 +185,7 @@ void VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey>::Des
 		throw;
 	}
 
-	m_IdentifierToIndexMap[identifier] = -1;
+	m_IdentifierToIndexMap.erase(identifier);
 
 	auto range = m_IndexToIdentifiersMap.equal_range(directIndex);
 	int refCount = 0;
@@ -214,16 +213,61 @@ void VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey>::Des
 		{
 			range = m_IndexToIdentifiersMap.equal_range(lastIndex);
 
-			for (auto iter = range.first; iter != range.second; ++iter)
+			for (auto iter = range.first; iter != range.second;)
 			{
 				m_IdentifierToIndexMap[iter->second] = directIndex;
+				m_IndexToIdentifiersMap.insert(std::pair<size_t, size_t>(directIndex, iter->second));
+				iter = m_IndexToIdentifiersMap.erase(iter);
 			}
 
 			m_ResourceArray[directIndex] = m_ResourceArray[lastIndex];
+			m_ResourceKeyArray[directIndex] = m_ResourceKeyArray[lastIndex];
 		}
 
-		m_ResourceArray.erase(m_ResourceArray.begin() + lastIndex);
+		m_ResourceArray.erase(m_ResourceArray.end() - 1);
+		m_ResourceKeyArray.erase(m_ResourceKeyArray.end() - 1);
 	}	
+}
+
+template <typename TResource, typename TInputData, typename TResourceKey>
+void VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey>::DestroyResourceByDirectIndex(const size_t directIndex)
+{
+	if (directIndex >= m_ResourceArray.size())
+	{
+		printf_console("[VulkanGraphics] invalid try of destroying gfx resource with index %d\n", directIndex);
+
+		throw;
+	}
+
+	auto range = m_IndexToIdentifiersMap.equal_range(directIndex);
+
+	for (auto iter = range.first; iter != range.second;)
+	{
+		m_IdentifierToIndexMap.erase(iter->second);
+		iter = m_IndexToIdentifiersMap.erase(iter);
+	}
+
+	DestroyResourcePhysicially(m_ResourceArray[directIndex]);
+
+	size_t lastIndex = m_ResourceArray.size() - 1;
+
+	if (directIndex != lastIndex)
+	{
+		range = m_IndexToIdentifiersMap.equal_range(lastIndex);
+
+		for (auto iter = range.first; iter != range.second;)
+		{
+			m_IdentifierToIndexMap[iter->second] = directIndex;
+			m_IndexToIdentifiersMap.insert(std::pair<size_t, size_t>(directIndex, iter->second));
+			iter = m_IndexToIdentifiersMap.erase(iter);
+		}
+
+		m_ResourceArray[directIndex] = m_ResourceArray[lastIndex];
+		m_ResourceKeyArray[directIndex] = m_ResourceKeyArray[lastIndex];
+	}
+
+	m_ResourceArray.erase(m_ResourceArray.end() - 1);
+	m_ResourceKeyArray.erase(m_ResourceKeyArray.end() - 1);
 }
 
 template <class TStruct>
