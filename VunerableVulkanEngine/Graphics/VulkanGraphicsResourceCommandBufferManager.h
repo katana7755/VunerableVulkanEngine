@@ -2,11 +2,15 @@
 
 #include "VulkanGraphicsResourceBase.h"
 #include "VulkanGraphicsResourceSemaphoreManager.h"
+#include "VulkanGraphicsResourceShaderManager.h"
+#include <typeindex>
 #include <vector>
+#include <tuple>
 
 typedef std::vector<VkCommandBuffer> VulkanCommandBufferArray;
 typedef std::vector<size_t> IndexArray;
 typedef std::vector<VkSubmitInfo> SubmitInfoArray;
+typedef std::vector<uint8_t> VulkanPushContstansRawData;
 
 namespace EVulkanCommandType
 {
@@ -26,10 +30,10 @@ class VulkanGraphicsResourceCommandBufferManager;
 
 struct VulkanGfxObjectUsage
 {
-	std::vector<VkImageView>	m_ReadTextureArray;		// TODO: this can be unified after applying identifier
-	std::vector<VkImageView>	m_WriteTextureArray;	// TODO: this can be unified after applying identifier
-	std::vector<VkBufferView>	m_ReadBufferArray;		// TODO: this can be unified after applying identifier
-	std::vector<VkBufferView>	m_WriteBufferArray;		// TODO: this can be unified after applying identifier
+	std::vector<VkImage>	m_ReadTextureArray;		// TODO: this can be unified after applying identifier
+	std::vector<VkImage>	m_WriteTextureArray;	// TODO: this can be unified after applying identifier
+	std::vector<VkBuffer>	m_ReadBufferArray;		// TODO: this can be unified after applying identifier
+	std::vector<VkBuffer>	m_WriteBufferArray;		// TODO: this can be unified after applying identifier
 
 	VulkanGfxObjectUsage()
 	{
@@ -56,20 +60,136 @@ struct VulkanQueueSubmitNode
 {
 	std::unordered_map<VkQueue, VulkanCommandBufferArray>	m_AggregatedCommandBufferArrayMap;
 	VulkanGfxObjectUsage									m_AggregatedGfxObjectUsage;
-	VkSemaphore												m_SignalSemaphore;
+	size_t													m_SignalSemaphoreIdentifier;
+	std::unordered_map<VkQueue, VkSubmitInfo>				m_ResultSubmitInfoMap;
 
-	VulkanQueueSubmitNode();
-
-	bool Aggregate(EVulkanCommandType::TYPE commandType, const VkCommandBuffer& commandBuffer, const VulkanGfxObjectUsage& gfxObjectUsage);
+	void Initialize();
+	void Deinitialize();
+	bool AggregateCommandBuffer(EVulkanCommandType::TYPE commandType, const VkCommandBuffer& commandBuffer, const VulkanGfxObjectUsage& gfxObjectUsage);
+	const VkSemaphore& GetSemaphore();
 };
 
-struct VulkanGfxExecutionBase
+namespace VulkanGfxExecution
 {
-	friend class VulkanGraphicsResourceCommandBufferManager;
+	struct ExecutionBase
+	{
+		friend class VulkanGraphicsResourceCommandBufferManager;
 
-private:
-	virtual void Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage) {};
-};
+	private:
+		virtual void Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage) {};
+	};
+
+	// TODO: this should be changed after implementing the render pass manager, frame buffer manager???
+	struct BeginRenderPassExecution : ExecutionBase
+	{
+		int			m_RenderPassIndex;
+		int			m_FramebufferIndex;
+		VkImage		m_FrameBufferColor;
+		VkImage		m_FrameBufferDepth;
+		VkRect2D	m_RenderArea;
+
+	private:
+		void Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage) override;
+	};
+
+	struct BindPipelineExecution : ExecutionBase
+	{
+		size_t m_PipelineIdentifier;
+
+	private:
+		void Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage) override;
+	};
+
+	struct PushConstantsExecution : ExecutionBase
+	{
+		size_t									m_PipelineIdentifier;
+		std::vector<VulkanPushContstansRawData>	m_RawDataArrays[EVulkanShaderType::MAX];
+
+	private:
+		void Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage) override;
+	};
+
+	// TODO: this will be reimplemented with new descriptor set manager
+	struct BindDescriptorSetsExecution : ExecutionBase
+	{
+		size_t							m_PipelineIdentifier;
+		std::vector<VkDescriptorSet>	m_DescriptorSetArray;
+		VulkanGfxObjectUsage			m_GfxObjectUsage;
+
+	private:
+		void Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage) override;
+	};
+
+	// TODO: this will be reimplemented with new gfx object manager?
+	struct DrawIndexedExectuion : ExecutionBase
+	{
+		size_t					m_PipelineIdentifier;
+		VkBuffer				m_VertexBuffer;
+		VkBuffer				m_IndexBuffer;
+		uint32_t				m_InstanceCount;
+		uint32_t				m_IndexCount;
+		VulkanGfxObjectUsage	m_GfxObjectUsage;
+
+	private:
+		void Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage) override;
+	};
+
+	// TODO: currently only handling color images, but in the future other image type will be supported
+	// TODO: it is necessary to implement abstract image class which contains every status values such as a layout and a access mask
+	struct CopyImageExecution : ExecutionBase
+	{
+		VkImage			m_SourceImage;
+		VkImageLayout	m_SourceLayoutFrom;
+		VkImageLayout	m_SourceLayoutTo;
+		VkAccessFlags	m_SourceAccessMaskFrom;
+		VkAccessFlags	m_SourceAccessMaskTo;
+		VkImage			m_DestinationImage;
+		VkImageLayout	m_DestinationLayoutFrom;
+		VkImageLayout	m_DestinationLayoutTo;
+		VkAccessFlags	m_DestinationAccessMaskFrom;
+		VkAccessFlags	m_DestinationAccessMaskTo;
+		uint32_t		m_Width;
+		uint32_t		m_Height;
+
+	private:
+		void Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage) override;
+	};
+
+	struct EndRenderPassExecution : ExecutionBase
+	{
+	private:
+		void Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage) override;
+	};
+
+	typedef std::unordered_multimap<std::type_index, ExecutionBase*> ExecutionPoolType;
+
+	ExecutionPoolType& GetExecutionPool();
+
+	template <class TExecution>
+	TExecution* AllocateExecution()
+	{
+		// TODO: need to consider multex for supporting multi threading?
+		static_assert(std::is_base_of<ExecutionBase, TExecution>::value, "this function should be called with a class derived by VulkanGfxExecution::ExecutionBase.");
+
+		TExecution* executionPtr = NULL;
+		std::type_index typeIndex = typeid(executionPtr);
+
+		auto range = GetExecutionPool().equal_range(typeIndex);
+
+		if (range.first == range.second)
+		{
+			GetExecutionPool().insert(ExecutionPoolType::value_type(typeIndex, new TExecution()));
+		}
+
+		range = GetExecutionPool().equal_range(typeIndex);
+
+		auto iter = range.first;
+		executionPtr = (TExecution*)iter->second;
+		GetExecutionPool().erase(iter);
+
+		return executionPtr;
+	}
+}
 
 struct VulkanCommandBufferInputData
 {
@@ -80,12 +200,12 @@ struct VulkanCommandBufferInputData
 
 struct VulkanCommandBufferOutputData
 {
-	EVulkanCommandType::TYPE			m_CommandType;
-	bool								m_IsTransient;
-	int									m_SortOrder;
-	std::vector<VulkanGfxExecutionBase>	m_ExecutionArray;
-	VkCommandBuffer						m_RecordedCommandBuffer;
-	VulkanGfxObjectUsage				m_RecordedGfxObjectUsage;
+	EVulkanCommandType::TYPE						m_CommandType;
+	bool											m_IsTransient;
+	int												m_SortOrder;
+	std::vector<VulkanGfxExecution::ExecutionBase*>	m_ExecutionPtrArray;
+	VkCommandBuffer									m_RecordedCommandBuffer;
+	VulkanGfxObjectUsage							m_RecordedGfxObjectUsage;
 };
 
 class VulkanGraphicsResourceCommandBufferManager : public VulkanGraphicsResourceManagerBase<VulkanCommandBufferOutputData, VulkanCommandBufferInputData, size_t>
@@ -103,9 +223,10 @@ protected:
 
 public:
 	void FreeAllStaticCommandBuffers();
-	void FreeAllSemaphores();
-	void BuildRenderGraph();
-	void SubmitAll();
+	void FreeAllQueueSubmitNodes();
+	void BuildAll();
+	void SubmitAll(const std::vector<VkSemaphore>& additionalWaitSemaphoreArray);
+	VkSemaphore GetSemaphoreForSubmission();
 
 private:
 	void CreateSingleCommandPool(EVulkanCommandType::TYPE commandType, bool isTransient);
@@ -116,7 +237,7 @@ private:
 private:
 	std::unordered_map<EVulkanCommandType::TYPE, VkCommandPool>	m_StaticCommandPoolMap;
 	std::unordered_map<EVulkanCommandType::TYPE, VkCommandPool>	m_TransientCommandPoolMap;
-	std::vector<size_t>											m_SemaphoreIdentifierArray;
+	std::vector<VulkanQueueSubmitNode>							m_QueueSubmitNodeArray;
 };
 
 class OldVulkanGraphicsResourceCommandBufferManager : public VulkanGraphicsResourceBase

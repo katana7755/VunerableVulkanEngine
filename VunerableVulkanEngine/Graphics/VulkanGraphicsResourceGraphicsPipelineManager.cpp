@@ -18,9 +18,12 @@ VulkanGraphicsPipelineOutputData VulkanGraphicsResourceGraphicsPipelineManager::
 {
     auto outputData = VulkanGraphicsPipelineOutputData();
     auto pipelineLayoutInputData = VulkanPipelineLayoutInputData();
+    size_t pushConstantsOffset = 0;
 
     for (int i = 0; i < EVulkanShaderType::MAX; ++i)
     {
+        outputData.m_ShaderIdentifiers[i] = inputData.m_ShaderIdentifiers[i];
+
         if (inputData.m_ShaderIdentifiers[i] == -1)
         {
             continue;
@@ -38,11 +41,13 @@ VulkanGraphicsPipelineOutputData VulkanGraphicsResourceGraphicsPipelineManager::
 
         if (shaderMetaData.DoesHavePushConstant())
         {
+            auto stageFlags = shaderMetaData.GetShaderStageBits();
             auto pushConstantRange = VkPushConstantRange();
-            pushConstantRange.stageFlags = shaderMetaData.GetShaderStageBits();
-            pushConstantRange.offset = shaderMetaData.m_PushConstantOffset;
-            pushConstantRange.size = shaderMetaData.m_PushConstantSize;
+            pushConstantRange.stageFlags = stageFlags;
+            pushConstantRange.offset = pushConstantsOffset;
+            pushConstantRange.size = shaderMetaData.m_PushConstantsSize;
             pipelineLayoutInputData.m_PushConstantRangeArray.push_back(pushConstantRange);
+            pushConstantsOffset += shaderMetaData.m_PushConstantsSize;
         }
     }
     
@@ -103,7 +108,7 @@ VkPipelineShaderStageCreateInfo CreateShaderStageInfo(const size_t& shaderIdenti
     info.stage = metaData.GetShaderStageBits();
     info.module = VulkanGraphicsResourceShaderManager::GetInstance().GetResource(shaderIdentifier);
     info.pName = "main";
-    info.pSpecializationInfo = NULL; // TODO: find out what this is for...
+    info.pSpecializationInfo = NULL; // TODO: find out what this is for...this is dynamic branching purpose meaning you can JIT-compile the spirv with runtime defined constant...
 
     return info;
 }

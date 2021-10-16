@@ -22,6 +22,7 @@ const int MAX_COMMAND_BUFFER_COUNT = 1;
 size_t g_VertexShaderIdentifier = -1;
 size_t g_fragmentShaderIdentifier = -1;
 size_t g_PipelineIdentifier = -1;
+size_t g_RenderingCommandBufferIdentifier = -1;
 
 VulkanGraphics::VulkanGraphics()
 {
@@ -242,64 +243,26 @@ void VulkanGraphics::SubmitPrimary()
 	TransferAllStagingBuffers();
 
 	auto acquireNextImageSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_AcquireNextImageSemaphoreIndex);
-	auto queueSubmitFence = m_ResourcePipelineMgr.GetGfxFence(m_QueueSubmitFenceIndex);
-	auto queueSubmitPrimarySemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_QueueSubmitPrimarySemaphoreIndex);
-	vkWaitForFences(m_ResourceDevice.GetLogicalDevice(), 1, &queueSubmitFence, VK_TRUE, UINT64_MAX);
-	vkResetFences(m_ResourceDevice.GetLogicalDevice(), 1, &queueSubmitFence);
 	VulkanGraphicsResourceSwapchain::AcquireNextImage(acquireNextImageSemaphore, VK_NULL_HANDLE);
 
-	auto imageIndex = VulkanGraphicsResourceSwapchain::GetAcquiredImageIndex();
 
-	std::vector<VkSemaphore> waitSemaphoreArray;
 	{
-		waitSemaphoreArray.push_back(acquireNextImageSemaphore);
+		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::SubmitAllCommandBuffers>();
+		commandPtr->m_WaitSemaphoreArray.push_back(acquireNextImageSemaphore);
 	}
 
-	std::vector<VkPipelineStageFlags> waitDstStageMaskArray;
-	{
-		waitDstStageMaskArray.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-	}
-
-	std::vector<VkCommandBuffer> commandBufferArray;
-	{
-		commandBufferArray.push_back(m_ResourceCommandBufferMgr.GetPrimaryCommandBuffer(imageIndex));
-	}
-
-	std::vector<VkSemaphore> signalSemaphoreArray;
-	{
-		signalSemaphoreArray.push_back(queueSubmitPrimarySemaphore);
-	}
-
-	auto submitInfo = VkSubmitInfo();
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.pNext = NULL;
-	submitInfo.waitSemaphoreCount = waitSemaphoreArray.size();
-	submitInfo.pWaitSemaphores = waitSemaphoreArray.data();
-	submitInfo.pWaitDstStageMask = waitDstStageMaskArray.data();
-	submitInfo.commandBufferCount = commandBufferArray.size(); // TODO: in the future think about submitting multiple queues simultaneously...
-	submitInfo.pCommandBuffers = commandBufferArray.data();
-	submitInfo.signalSemaphoreCount = signalSemaphoreArray.size();
-	submitInfo.pSignalSemaphores = signalSemaphoreArray.data();
-
-	auto result = vkQueueSubmit(m_ResourceDevice.GetGraphicsQueue(), 1, &submitInfo, queueSubmitFence);
-
-	if (result)
-	{
-		printf_console("[VulkanGraphics] failed to submit a queue with error code %d\n", result);
-
-		throw;
-	}
+	// Execute body commands
+	VulnerableLayer::ExecuteAllCommands();
 }
 
 void VulkanGraphics::SubmitAdditional()
 {
-	auto queueSubmitPrimarySemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_QueueSubmitPrimarySemaphoreIndex);
 	auto queueSubmitAdditionalSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_QueueSubmitAdditionalSemaphoreIndex);
 	auto imageIndex = VulkanGraphicsResourceSwapchain::GetAcquiredImageIndex();
 
 	std::vector<VkSemaphore> waitSemaphoreArray;
 	{
-		waitSemaphoreArray.push_back(queueSubmitPrimarySemaphore);
+		waitSemaphoreArray.push_back(VulkanGraphicsResourceCommandBufferManager::GetInstance().GetSemaphoreForSubmission());
 	}
 
 	std::vector<VkPipelineStageFlags> waitDstStageMaskArray;
@@ -364,7 +327,7 @@ void VulkanGraphics::PresentFrame()
 	presentInfo.pImageIndices = &imageIndex;
 	presentInfo.pResults = NULL;
 
-	auto result = vkQueuePresentKHR(m_ResourceDevice.GetGraphicsQueue(), &presentInfo);
+	auto result = vkQueuePresentKHR(m_ResourceDevice.GetPresentQueue(), &presentInfo);
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR)
 	{
@@ -431,8 +394,6 @@ void VulkanGraphics::DoTest()
 
 void VulkanGraphics::BuildRenderLoop()
 {
-	m_ResourceCommandBufferMgr.AllocatePrimaryBufferArray();
-
 	std::vector<VkAttachmentDescription> attachmentDescArray;
 	{
 		auto desc = VkAttachmentDescription();
@@ -529,6 +490,9 @@ void VulkanGraphics::BuildRenderLoop()
 		m_BackBufferIndexArray.push_back(m_ResourceRenderPassMgr.CreateFramebuffer(renderPassIndex, { m_ResourceSwapchain.GetImageView(i), m_DepthBuffer.GetImageView() }, width, height, 1));
 	}
 
+	m_FrontBufferIndexArray.clear();
+	m_ColorBufferArray.clear();
+
 	for (int i = 0; i < 1; ++i)
 	{
 		VulkanGraphicsObjectTexture colorBuffer;
@@ -558,8 +522,7 @@ void VulkanGraphics::BuildRenderLoop()
 		commandPtr->m_UploadBufferID = VulnerableUploadBufferManager::LoadFromFile("../Shaders/Output/coloredtriangle_vert.spv");
 		commandPtr->m_MetaData.m_Type = EVulkanShaderType::VERTEX;
 		commandPtr->m_MetaData.m_Name = "../Shaders/Output/coloredtriangle_vert.spv";
-		commandPtr->m_MetaData.m_PushConstantOffset = 0;
-		commandPtr->m_MetaData.m_PushConstantSize = 64 + 12; // mat4x4 + vec3
+		commandPtr->m_MetaData.m_PushConstantsSize = 64 + 12; // mat4x4 + vec3
 		commandPtr->m_MetaData.m_VertexInputArray.push_back(EVulkanShaderVertexInput::VECTOR3); // position
 		commandPtr->m_MetaData.m_VertexInputArray.push_back(EVulkanShaderVertexInput::VECTOR2); // uv
 		commandPtr->m_MetaData.m_VertexInputArray.push_back(EVulkanShaderVertexInput::VECTOR3); // normal
@@ -589,6 +552,7 @@ void VulkanGraphics::BuildRenderLoop()
 		g_PipelineIdentifier = commandPtr->m_Identifier;
 	}
 
+	// Execute header commands
 	VulnerableLayer::ExecuteAllCommands();
 
 
@@ -608,160 +572,124 @@ void VulkanGraphics::BuildRenderLoop()
 	m_ResourcePipelineMgr.UpdateDescriptorSet(descriptorSetIndex, 0, m_CharacterHeadTexture.GetImageView(), m_CharacterHeadSampler.GetSampler());
 	m_ResourcePipelineMgr.UpdateDescriptorSet(descriptorSetIndex, 1, m_CharacterBodyTexture.GetImageView(), m_CharacterBodySampler.GetSampler());
 
-	auto beginInfo = VkCommandBufferBeginInfo();
-	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	beginInfo.pNext = NULL;
-	beginInfo.flags = NULL;
-	beginInfo.pInheritanceInfo = NULL; // TODO: use this when building a secondary command buffer...(NECESSARY!!!)
 
-	int count = VulkanGraphicsResourceSwapchain::GetImageViewCount();
-
-	for (int i = 0; i < count; ++i)
+	if (g_RenderingCommandBufferIdentifier == (size_t)-1)
 	{
-		auto commandBuffer = m_ResourceCommandBufferMgr.GetPrimaryCommandBuffer(i);
-		auto result = vkBeginCommandBuffer(commandBuffer, &beginInfo);
+		g_RenderingCommandBufferIdentifier = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().AllocateIdentifier();
 
-		if (result)
 		{
-			printf_console("[VulkanGraphics] failed to begin a command buffer with error code %d\n", result);
-
-			throw;
+			auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::CreateCommandBuffer>();
+			commandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
+			commandPtr->m_InputData.m_CommandType = EVulkanCommandType::GRAPHICS;
+			commandPtr->m_InputData.m_IsTransient = false;
+			commandPtr->m_InputData.m_SortOrder = 0;
 		}
 
-		std::vector<VkClearValue> clearValueArray;
 		{
-			auto clearValue = VkClearValue();
-			clearValue.color = { 0.0f, 0.0f, 1.0f, 1.0f };
-			clearValue.depthStencil.depth = 0.0f;
-			clearValue.depthStencil.stencil = 0;
-			clearValueArray.push_back(clearValue);
-		}
-		{
-			auto clearValue = VkClearValue();
-			clearValue.color = { 0.0f, 0.0f, 0.0f, 0.0f };
-			clearValue.depthStencil.depth = 1.0f;
-			clearValue.depthStencil.stencil = 0;
-			clearValueArray.push_back(clearValue);
+			auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
+			commandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
+
+			auto gfxExecutionPtr = VulkanGfxExecution::AllocateExecution<VulkanGfxExecution::BeginRenderPassExecution>();
+			gfxExecutionPtr->m_RenderPassIndex = renderPassIndex;
+			gfxExecutionPtr->m_FramebufferIndex = m_FrontBufferIndexArray[0];
+			gfxExecutionPtr->m_FrameBufferColor = m_ColorBufferArray[0].GetImage();
+			gfxExecutionPtr->m_FrameBufferDepth = m_DepthBuffer.GetImage();
+			gfxExecutionPtr->m_RenderArea = { {0, 0}, {width, height} };
+			commandPtr->m_ExecutionPtr = gfxExecutionPtr;
 		}
 
-		auto pipelineLayout = VulkanGraphicsResourcePipelineLayoutManager::GetInstance().GetResource(pipelineData.m_PipelineLayoutIdentifier);
-		auto pipeline = pipelineData.m_Pipeline;
-		auto renderPassBegin = VkRenderPassBeginInfo();
-		renderPassBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassBegin.pNext = NULL;
-		renderPassBegin.renderPass = m_ResourceRenderPassMgr.GetRenderPass(renderPassIndex);
-		//renderPassBegin.framebuffer = m_ResourceRenderPassMgr.GetFramebuffer(m_BackBufferIndexArray[i]);
-		renderPassBegin.framebuffer = m_ResourceRenderPassMgr.GetFramebuffer(m_FrontBufferIndexArray[0]);
-		renderPassBegin.renderArea = { {0, 0}, {width, height} };
-		renderPassBegin.clearValueCount = clearValueArray.size();
-		renderPassBegin.pClearValues = clearValueArray.data();
-		vkCmdBeginRenderPass(commandBuffer, &renderPassBegin, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushMVPMatrix), &pushMVPMatrix);
-		vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, sizeof(pushMVPMatrix), sizeof(mainLightDirection), &mainLightDirection);
-		vkCmdBindVertexBuffers(commandBuffer, 0, 1, &m_CharacterMesh.GetVertexBuffer(), new VkDeviceSize[]{ 0 }); // TODO: one day consider to bind multiple vertex buffers simultaneously...
-		vkCmdBindIndexBuffer(commandBuffer, m_CharacterMesh.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, m_ResourcePipelineMgr.GetDescriptorSetArray().size(), m_ResourcePipelineMgr.GetDescriptorSetArray().data(), 0, NULL); // TODO: what is dynamic offset and when do we need it?
-		vkCmdDrawIndexed(commandBuffer, m_CharacterMesh.GetIndexCount(), 1, 0, 0, 0);
-		vkCmdEndRenderPass(commandBuffer);
+		{
+			auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
+			commandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
 
-		auto imageBarrierArray = std::vector<VkImageMemoryBarrier>();
-		{
-			auto imageBarrier = VkImageMemoryBarrier();
-			imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-			imageBarrier.pNext = NULL;
-			imageBarrier.srcAccessMask = 0;
-			imageBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-			imageBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-			imageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-			imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			imageBarrier.image = m_ColorBufferArray[0].GetImage();
-			imageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			imageBarrier.subresourceRange.baseMipLevel = 0;
-			imageBarrier.subresourceRange.levelCount = 1;
-			imageBarrier.subresourceRange.baseArrayLayer = 0;
-			imageBarrier.subresourceRange.layerCount = 1;
-			imageBarrierArray.push_back(imageBarrier);
-		}
-		{
-			auto imageBarrier = VkImageMemoryBarrier();
-			imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-			imageBarrier.pNext = NULL;
-			imageBarrier.srcAccessMask = 0;
-			imageBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-			imageBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			imageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-			imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			imageBarrier.image = m_ColorBufferArray[1].GetImage();
-			imageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			imageBarrier.subresourceRange.baseMipLevel = 0;
-			imageBarrier.subresourceRange.levelCount = 1;
-			imageBarrier.subresourceRange.baseArrayLayer = 0;
-			imageBarrier.subresourceRange.layerCount = 1;
-			imageBarrierArray.push_back(imageBarrier);
+			auto gfxExecutionPtr = VulkanGfxExecution::AllocateExecution<VulkanGfxExecution::BindPipelineExecution>();
+			gfxExecutionPtr->m_PipelineIdentifier = g_PipelineIdentifier;
+			commandPtr->m_ExecutionPtr = gfxExecutionPtr;
 		}
 
-		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, imageBarrierArray.size(), imageBarrierArray.data());
-
-		auto imageRegion = VkImageCopy();
-		imageRegion.srcSubresource = VkImageSubresourceLayers { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-		imageRegion.srcOffset = VkOffset3D { 0, 0, 0 };
-		imageRegion.dstSubresource = VkImageSubresourceLayers { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-		imageRegion.dstOffset = VkOffset3D { 0, 0, 0 };
-		imageRegion.extent = VkExtent3D { width, height, 1 };
-		vkCmdCopyImage(commandBuffer, m_ColorBufferArray[0].GetImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_ColorBufferArray[1].GetImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageRegion);
-		imageBarrierArray.clear();
-
 		{
-			auto imageBarrier = VkImageMemoryBarrier();
-			imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-			imageBarrier.pNext = NULL;
-			imageBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-			imageBarrier.dstAccessMask = 0;
-			imageBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-			imageBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-			imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			imageBarrier.image = m_ColorBufferArray[0].GetImage();
-			imageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			imageBarrier.subresourceRange.baseMipLevel = 0;
-			imageBarrier.subresourceRange.levelCount = 1;
-			imageBarrier.subresourceRange.baseArrayLayer = 0;
-			imageBarrier.subresourceRange.layerCount = 1;
-			imageBarrierArray.push_back(imageBarrier);
-		}
-		{
-			auto imageBarrier = VkImageMemoryBarrier();
-			imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-			imageBarrier.pNext = NULL;
-			imageBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-			imageBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-			imageBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-			imageBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			imageBarrier.image = m_ColorBufferArray[1].GetImage();
-			imageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			imageBarrier.subresourceRange.baseMipLevel = 0;
-			imageBarrier.subresourceRange.levelCount = 1;
-			imageBarrier.subresourceRange.baseArrayLayer = 0;
-			imageBarrier.subresourceRange.layerCount = 1;
-			imageBarrierArray.push_back(imageBarrier);
+			auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
+			commandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
+
+			auto gfxExecutionPtr = VulkanGfxExecution::AllocateExecution<VulkanGfxExecution::PushConstantsExecution>();
+			gfxExecutionPtr->m_PipelineIdentifier = g_PipelineIdentifier;
+
+			{
+				auto dataPtr = (uint8_t*)(&pushMVPMatrix);
+				size_t dataSize = sizeof(pushMVPMatrix);
+				gfxExecutionPtr->m_RawDataArrays[EVulkanShaderType::VERTEX].push_back(VulkanPushContstansRawData(dataPtr, dataPtr + dataSize));
+			}
+
+			{
+				auto dataPtr = (uint8_t*)(&mainLightDirection);
+				size_t dataSize = sizeof(mainLightDirection);
+				gfxExecutionPtr->m_RawDataArrays[EVulkanShaderType::VERTEX].push_back(VulkanPushContstansRawData(dataPtr, dataPtr + dataSize));
+			}
+			
+			commandPtr->m_ExecutionPtr = gfxExecutionPtr;
 		}
 
-		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, imageBarrierArray.size(), imageBarrierArray.data());
-
-		result = vkEndCommandBuffer(commandBuffer);
-
-		if (result)
 		{
-			printf_console("[VulkanGraphics] failed to record a command buffer with error code %d\n", result);
+			auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
+			commandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
 
-			throw;
+			auto gfxExecutionPtr = VulkanGfxExecution::AllocateExecution<VulkanGfxExecution::BindDescriptorSetsExecution>();
+			gfxExecutionPtr->m_PipelineIdentifier = g_PipelineIdentifier;
+			gfxExecutionPtr->m_DescriptorSetArray = std::vector<VkDescriptorSet>(m_ResourcePipelineMgr.GetDescriptorSetArray());
+			gfxExecutionPtr->m_GfxObjectUsage.m_ReadTextureArray.push_back(m_CharacterHeadTexture.GetImage());
+			gfxExecutionPtr->m_GfxObjectUsage.m_ReadTextureArray.push_back(m_CharacterBodyTexture.GetImage());
+			commandPtr->m_ExecutionPtr = gfxExecutionPtr;
+		}
+
+		{
+			auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
+			commandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
+
+			auto gfxExecutionPtr = VulkanGfxExecution::AllocateExecution<VulkanGfxExecution::DrawIndexedExectuion>();
+			gfxExecutionPtr->m_PipelineIdentifier = g_PipelineIdentifier;
+			gfxExecutionPtr->m_VertexBuffer = m_CharacterMesh.GetVertexBuffer();
+			gfxExecutionPtr->m_IndexBuffer = m_CharacterMesh.GetIndexBuffer();
+			gfxExecutionPtr->m_InstanceCount = 1;
+			gfxExecutionPtr->m_IndexCount = m_CharacterMesh.GetIndexCount();
+			gfxExecutionPtr->m_InstanceCount = 1;
+			gfxExecutionPtr->m_GfxObjectUsage.m_ReadBufferArray.push_back(m_CharacterMesh.GetVertexBuffer());
+			gfxExecutionPtr->m_GfxObjectUsage.m_ReadBufferArray.push_back(m_CharacterMesh.GetIndexBuffer());
+			commandPtr->m_ExecutionPtr = gfxExecutionPtr;
+		}
+
+		{
+			auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
+			commandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
+			commandPtr->m_ExecutionPtr = VulkanGfxExecution::AllocateExecution<VulkanGfxExecution::EndRenderPassExecution>();
+		}
+
+		{
+			auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
+			commandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
+
+			auto gfxExecutionPtr = VulkanGfxExecution::AllocateExecution<VulkanGfxExecution::CopyImageExecution>();
+			gfxExecutionPtr->m_SourceImage = m_ColorBufferArray[0].GetImage();
+			gfxExecutionPtr->m_SourceLayoutFrom = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			gfxExecutionPtr->m_SourceLayoutTo = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			gfxExecutionPtr->m_SourceAccessMaskFrom = 0;
+			gfxExecutionPtr->m_SourceAccessMaskTo = 0;
+			gfxExecutionPtr->m_DestinationImage = m_ColorBufferArray[1].GetImage();
+			gfxExecutionPtr->m_DestinationLayoutFrom = VK_IMAGE_LAYOUT_UNDEFINED;
+			gfxExecutionPtr->m_DestinationLayoutTo = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			gfxExecutionPtr->m_DestinationAccessMaskFrom = 0;
+			gfxExecutionPtr->m_DestinationAccessMaskTo = VK_ACCESS_SHADER_READ_BIT;
+			gfxExecutionPtr->m_Width = width;
+			gfxExecutionPtr->m_Height = height;
+			commandPtr->m_ExecutionPtr = gfxExecutionPtr;
+		}
+
+		{
+			auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::BuildAllCommandBuffers>();
 		}
 	}
+
+	// Execute body commands
+	VulnerableLayer::ExecuteAllCommands();
 }
 
 void VulkanGraphics::CreateDescriptorSet()

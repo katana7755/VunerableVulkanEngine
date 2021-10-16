@@ -29,7 +29,7 @@ public:
 	}
 
 public:
-	const TResource& GetResource(const size_t identifier);
+	TResource& GetResource(const size_t identifier);
 	const TResourceKey& GetResourceKey(const size_t identifier);
 	size_t AllocateIdentifier();
 	void ReleaseIdentifier(const size_t identifier);
@@ -56,7 +56,7 @@ protected:
 };
 
 template <typename TResource, typename TInputData, typename TResourceKey>
-const TResource& VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey>::GetResource(const size_t identifier)
+TResource& VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey>::GetResource(const size_t identifier)
 {
 	if (m_IdentifierToIndexMap.find(identifier) == m_IdentifierToIndexMap.end())
 	{

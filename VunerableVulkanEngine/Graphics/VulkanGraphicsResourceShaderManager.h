@@ -45,12 +45,11 @@ namespace EVulkanShaderVertexInput
 
 struct VulkanShaderMetaData
 {
-	EVulkanShaderType::TYPE m_Type;
-	std::string m_Name;
+	EVulkanShaderType::TYPE							m_Type;
+	std::string										m_Name;
 	std::vector<EVulkanShaderBindingResource::TYPE> m_InputBindingArray;
-	size_t m_PushConstantOffset;
-	size_t m_PushConstantSize;
-	std::vector<EVulkanShaderVertexInput::TYPE> m_VertexInputArray; // only for vertex shader...support only 1 binding
+	size_t											m_PushConstantsSize;
+	std::vector<EVulkanShaderVertexInput::TYPE>		m_VertexInputArray; // only for vertex shader...support only 1 binding
 
 	bool operator==(const VulkanShaderMetaData& rhs)
 	{
@@ -69,16 +68,10 @@ struct VulkanShaderMetaData
 			return false;
 		}
 
-		if (m_PushConstantOffset != rhs.m_PushConstantOffset)
+		if (m_PushConstantsSize != rhs.m_PushConstantsSize)
 		{
 			return false;
 		}
-
-		if (m_PushConstantSize != rhs.m_PushConstantSize)
-		{
-			return false;
-		}
-
 
 		if (memcmp(m_VertexInputArray.data(), rhs.m_VertexInputArray.data(), sizeof(EVulkanShaderVertexInput::TYPE) * m_VertexInputArray.size()))
 		{
@@ -120,7 +113,7 @@ struct VulkanShaderMetaData
 
 	bool DoesHavePushConstant() const
 	{
-		return m_PushConstantSize > 0;
+		return m_PushConstantsSize > 0;
 	}
 
 	bool DoesHaveVertexInput() const

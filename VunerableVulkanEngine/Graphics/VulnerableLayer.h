@@ -30,7 +30,6 @@ namespace VulnerableCommand
 	struct CommandBase
 	{
 		friend class VulnerableLayer;
-		friend class VulkanGraphicsResourceCommandBufferManager;
 
 	private:
 		virtual void Execute() {};
@@ -79,14 +78,43 @@ namespace VulnerableCommand
 		void Execute() override;
 	};
 
-	struct BeginCommandBuffer : public BodyCommand
+	struct CreateCommandBuffer : public BodyCommand
+	{
+		size_t							m_Identifier;
+		VulkanCommandBufferInputData	m_InputData;
+
+	private:
+		void Execute() override;
+	};
+
+	struct RecordCommandBuffer : public BodyCommand
+	{
+		size_t								m_Identifier;
+		VulkanGfxExecution::ExecutionBase*	m_ExecutionPtr;
+
+	private:
+		void Execute() override;
+	};
+
+	struct DestroyCommandBuffer : public BodyCommand
+	{
+		size_t m_Identifier;
+
+	private:
+		void Execute() override;
+	};
+
+	struct BuildAllCommandBuffers : public BodyCommand
 	{
 	private:
 		void Execute() override;
 	};
 
-	struct EndCommandBuffer : public BodyCommand
+	// TODO: this needs to be reimplemted too...especially for how we handle additional wait semaphores...
+	struct SubmitAllCommandBuffers : public BodyCommand
 	{
+		std::vector<VkSemaphore> m_WaitSemaphoreArray;
+
 	private:
 		void Execute() override;
 	};
@@ -122,12 +150,16 @@ TCommand* VulnerableLayer::AllocateCommand()
 	TCommand* commandPtr = NULL;
 	std::type_index typeIndex = typeid(commandPtr);
 
-	if (GetCommandPool().find(typeIndex) == GetCommandPool().end())
+	auto range = GetCommandPool().equal_range(typeIndex);
+
+	if (range.first == range.second)
 	{
 		GetCommandPool().insert(CommandPoolType::value_type(typeIndex, new TCommand()));
 	}
 
-	auto iter = GetCommandPool().find(typeIndex);
+	range = GetCommandPool().equal_range(typeIndex);
+
+	auto iter = range.first;
 	commandPtr = (TCommand*)iter->second;
 	GetCommandPool().erase(iter);
 

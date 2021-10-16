@@ -32,12 +32,36 @@ namespace VulnerableCommand
 		VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().ReleaseIdentifier(m_Identifier);
 	}
 
-	void BeginCommandBuffer::Execute()
+	void CreateCommandBuffer::Execute()
 	{
+		VulkanGraphicsResourceCommandBufferManager::GetInstance().CreateResource(m_Identifier, m_InputData, m_Identifier);
 	}
 
-	void EndCommandBuffer::Execute()
+	void RecordCommandBuffer::Execute()
 	{
+		if (m_ExecutionPtr == NULL)
+		{
+			return;
+		}
+
+		auto& outputData = VulkanGraphicsResourceCommandBufferManager::GetInstance().GetResource(m_Identifier);
+		outputData.m_ExecutionPtrArray.push_back(m_ExecutionPtr);
+	}
+
+	void DestroyCommandBuffer::Execute()
+	{
+		VulkanGraphicsResourceCommandBufferManager::GetInstance().DestroyResource(m_Identifier);
+	}
+
+	void BuildAllCommandBuffers::Execute()
+	{
+		VulkanGraphicsResourceCommandBufferManager::GetInstance().FreeAllQueueSubmitNodes();
+		VulkanGraphicsResourceCommandBufferManager::GetInstance().BuildAll();
+	}
+
+	void SubmitAllCommandBuffers::Execute()
+	{
+		VulkanGraphicsResourceCommandBufferManager::GetInstance().SubmitAll(m_WaitSemaphoreArray);
 	}
 };
 
@@ -102,8 +126,8 @@ void VulnerableLayer::Deinitialize()
 void VulnerableLayer::ExecuteAllCommands()
 {
 	// TODO: need to consider multex for supporting multi threading?
-	auto headerCommandQueue = GetCurrentHeaderCommandQueue();
-	auto bodyCommandQueue = GetCurrentBodyCommandQueue();
+	auto& headerCommandQueue = GetCurrentHeaderCommandQueue();
+	auto& bodyCommandQueue = GetCurrentBodyCommandQueue();
 	IncrementCurrentCommandQueueIndex();
 
 	while (!headerCommandQueue.empty())

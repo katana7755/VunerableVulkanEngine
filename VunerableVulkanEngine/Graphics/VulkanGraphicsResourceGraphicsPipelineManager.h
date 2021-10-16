@@ -5,12 +5,12 @@
 
 struct VulkanGraphicsPipelineInputData
 {
-	// render pass (this will be changed after a render pass manager comes out
-	int m_RenderPassIndex;
-	uint32_t m_SubPassIndex;
+	// TODO: render pass (this will be changed after a render pass manager comes out
+	int			m_RenderPassIndex;
+	uint32_t	m_SubPassIndex;
 
 	// shaders
-	size_t m_ShaderIdentifiers[EVulkanShaderType::MAX];
+	size_t		m_ShaderIdentifiers[EVulkanShaderType::MAX];
 
 	// properties for the fixed pipeline
 
@@ -32,14 +32,20 @@ struct VulkanGraphicsPipelineInputData
 
 struct VulkanGraphicsPipelineOutputData
 {
-	size_t m_DescriptorSetLayoutIdentifiers[EVulkanShaderType::MAX];
-	size_t m_PipelineLayoutIdentifier;
-	VkPipeline m_Pipeline;
+	size_t		m_DescriptorSetLayoutIdentifiers[EVulkanShaderType::MAX];
+	size_t		m_PipelineLayoutIdentifier;
+	size_t		m_ShaderIdentifiers[EVulkanShaderType::MAX];
+	VkPipeline	m_Pipeline;
 
 	VulkanGraphicsPipelineOutputData()
 	{
 		memset(m_DescriptorSetLayoutIdentifiers, -1, EVulkanShaderType::MAX);
 		m_PipelineLayoutIdentifier = -1;
+	}
+
+	VkPipelineBindPoint GetBindPoint()
+	{
+		return VK_PIPELINE_BIND_POINT_GRAPHICS;
 	}
 };
 
