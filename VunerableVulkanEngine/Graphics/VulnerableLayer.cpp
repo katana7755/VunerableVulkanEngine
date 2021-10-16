@@ -39,13 +39,13 @@ namespace VulnerableCommand
 
 	void RecordCommandBuffer::Execute()
 	{
-		if (m_ExecutionPtr == NULL)
+		if (m_ExecutionPtrArray.size() == 0)
 		{
 			return;
 		}
 
 		auto& outputData = VulkanGraphicsResourceCommandBufferManager::GetInstance().GetResource(m_Identifier);
-		outputData.m_ExecutionPtrArray.push_back(m_ExecutionPtr);
+		outputData.m_ExecutionPtrArray.insert(outputData.m_ExecutionPtrArray.end(), m_ExecutionPtrArray.begin(), m_ExecutionPtrArray.end());
 	}
 
 	void DestroyCommandBuffer::Execute()

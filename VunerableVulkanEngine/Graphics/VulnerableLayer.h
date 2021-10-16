@@ -6,8 +6,7 @@
 #include <typeindex>
 #include <unordered_map>
 #include <queue>
-
-class VulnerableLayer;
+#include <functional>
 
 namespace VulnerableEnum
 {
@@ -25,11 +24,18 @@ namespace VulnerableEnum
 	};
 }
 
+namespace VulnerableLayer
+{
+	void Initialize();
+	void Deinitialize();
+	void ExecuteAllCommands();
+}
+
 namespace VulnerableCommand
 {
 	struct CommandBase
 	{
-		friend class VulnerableLayer;
+		friend void VulnerableLayer::ExecuteAllCommands();
 
 	private:
 		virtual void Execute() {};
@@ -89,8 +95,8 @@ namespace VulnerableCommand
 
 	struct RecordCommandBuffer : public BodyCommand
 	{
-		size_t								m_Identifier;
-		VulkanGfxExecution::ExecutionBase*	m_ExecutionPtr;
+		size_t											m_Identifier;
+		std::vector<VulkanGfxExecution::ExecutionBase*>	m_ExecutionPtrArray;
 
 	private:
 		void Execute() override;
@@ -122,23 +128,18 @@ namespace VulnerableCommand
 
 typedef std::unordered_multimap<std::type_index, VulnerableCommand::CommandBase*> CommandPoolType;
 
-class VulnerableLayer
+namespace VulnerableLayer
 {
-private:
-	VulnerableLayer() {};
-
-public:
-	static CommandPoolType& GetCommandPool();
-	static std::queue<VulnerableCommand::HeaderCommand*>& GetCurrentHeaderCommandQueue();
-	static std::queue<VulnerableCommand::BodyCommand*>& GetCurrentBodyCommandQueue();
-	static void IncrementCurrentCommandQueueIndex();
-
-	static void Initialize();
-	static void Deinitialize();
-	static void ExecuteAllCommands();
+	CommandPoolType& GetCommandPool();
+	std::queue<VulnerableCommand::HeaderCommand*>& GetCurrentHeaderCommandQueue();
+	std::queue<VulnerableCommand::BodyCommand*>& GetCurrentBodyCommandQueue();
+	void IncrementCurrentCommandQueueIndex();
 
 	template <class TCommand>
-	static TCommand* AllocateCommand();
+	TCommand* AllocateCommand();
+
+	template <class TCommand>
+	void AllocateCommandWithSetter(std::function<void(TCommand* commandPtr)> funcSetter);
 };
 
 template <class TCommand>
@@ -175,4 +176,15 @@ TCommand* VulnerableLayer::AllocateCommand()
 	}
 
 	return commandPtr;
+}
+
+template <class TCommand>
+static void VulnerableLayer::AllocateCommandWithSetter(std::function<void (TCommand* commandPtr)> funcSetter)
+{
+	auto* commandPtr = AllocateCommand<TCommand>();
+
+	if (funcSetter != NULL)
+	{
+		funcSetter(commandPtr);
+	}	
 }

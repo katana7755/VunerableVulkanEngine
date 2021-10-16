@@ -97,21 +97,15 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 
 void VulkanGraphics::Invalidate()
 {
-	{
-		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::DestroyGraphicsPipeline>();
+	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::DestroyGraphicsPipeline>([&](auto* commandPtr) {
 		commandPtr->m_Identifier = g_PipelineIdentifier;
-	}
-
-	{
-		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::DestroyShader>();
+		});
+	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::DestroyShader>([&](auto* commandPtr) {
 		commandPtr->m_Identifier = g_VertexShaderIdentifier;
-	}
-
-	{
-		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::DestroyShader>();
+		});
+	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::DestroyShader>([&](auto* commandPtr) {
 		commandPtr->m_Identifier = g_fragmentShaderIdentifier;
-	}
-
+		});
 	VulnerableLayer::ExecuteAllCommands();
 
 
@@ -244,12 +238,9 @@ void VulkanGraphics::SubmitPrimary()
 
 	auto acquireNextImageSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_AcquireNextImageSemaphoreIndex);
 	VulkanGraphicsResourceSwapchain::AcquireNextImage(acquireNextImageSemaphore, VK_NULL_HANDLE);
-
-
-	{
-		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::SubmitAllCommandBuffers>();
+	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::SubmitAllCommandBuffers>([&](auto* commandPtr) {
 		commandPtr->m_WaitSemaphoreArray.push_back(acquireNextImageSemaphore);
-	}
+		});
 
 	// Execute body commands
 	VulnerableLayer::ExecuteAllCommands();
@@ -515,9 +506,7 @@ void VulkanGraphics::BuildRenderLoop()
 	glm::mat4x4 pushMVPMatrix = pushProjectionMatrix * viewMatrix * modelMatrix;
 	glm::vec3 mainLightDirection = glm::vec3(0.0f, 0.0f, 1.0f);
 
-
-	{
-		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::CreateShader>();
+	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateShader>([&](auto* commandPtr) {
 		commandPtr->m_Identifier = VulkanGraphicsResourceShaderManager::GetInstance().AllocateIdentifier();
 		commandPtr->m_UploadBufferID = VulnerableUploadBufferManager::LoadFromFile("../Shaders/Output/coloredtriangle_vert.spv");
 		commandPtr->m_MetaData.m_Type = EVulkanShaderType::VERTEX;
@@ -528,10 +517,8 @@ void VulkanGraphics::BuildRenderLoop()
 		commandPtr->m_MetaData.m_VertexInputArray.push_back(EVulkanShaderVertexInput::VECTOR3); // normal
 		commandPtr->m_MetaData.m_VertexInputArray.push_back(EVulkanShaderVertexInput::VECTOR1); // material
 		g_VertexShaderIdentifier = commandPtr->m_Identifier;
-	}
-
-	{
-		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::CreateShader>();
+		});
+	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateShader>([&](auto* commandPtr) {
 		commandPtr->m_Identifier = VulkanGraphicsResourceShaderManager::GetInstance().AllocateIdentifier();
 		commandPtr->m_UploadBufferID = VulnerableUploadBufferManager::LoadFromFile("../Shaders/Output/coloredtriangle_frag.spv");
 		commandPtr->m_MetaData.m_Type = EVulkanShaderType::FRAGMENT;
@@ -539,20 +526,19 @@ void VulkanGraphics::BuildRenderLoop()
 		commandPtr->m_MetaData.m_InputBindingArray.push_back(EVulkanShaderBindingResource::TEXTURE2D); // samplerDiffuseHead
 		commandPtr->m_MetaData.m_InputBindingArray.push_back(EVulkanShaderBindingResource::TEXTURE2D); // samplerDiffuseBody
 		g_fragmentShaderIdentifier = commandPtr->m_Identifier;
-	}
+		});
 
 	// TODO: still need to handle frame buffer and render pass...
-	{
-		auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::CreateGraphicsPipeline>();
+	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateGraphicsPipeline>([&](auto* commandPtr) {
 		commandPtr->m_Identifier = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().AllocateIdentifier();
 		commandPtr->m_InputData.m_RenderPassIndex = renderPassIndex; // this need to be reworked after modifying the render pass manager
 		commandPtr->m_InputData.m_SubPassIndex = 0; // this need to be reworked after modifying the render pass manager
 		commandPtr->m_InputData.m_ShaderIdentifiers[EVulkanShaderType::VERTEX] = g_VertexShaderIdentifier;
 		commandPtr->m_InputData.m_ShaderIdentifiers[EVulkanShaderType::FRAGMENT] = g_fragmentShaderIdentifier;
 		g_PipelineIdentifier = commandPtr->m_Identifier;
-	}
+		});
 
-	// Execute header commands
+	// Execute header commands (I handled in this way because still didn't create the descriptor set manager)....
 	VulnerableLayer::ExecuteAllCommands();
 
 
@@ -577,41 +563,26 @@ void VulkanGraphics::BuildRenderLoop()
 	{
 		g_RenderingCommandBufferIdentifier = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().AllocateIdentifier();
 
-		{
-			auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::CreateCommandBuffer>();
+		VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateCommandBuffer>([&](auto* commandPtr) {
 			commandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
 			commandPtr->m_InputData.m_CommandType = EVulkanCommandType::GRAPHICS;
 			commandPtr->m_InputData.m_IsTransient = false;
 			commandPtr->m_InputData.m_SortOrder = 0;
-		}
+			});
 
-		{
-			auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
-			commandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
-
-			auto gfxExecutionPtr = VulkanGfxExecution::AllocateExecution<VulkanGfxExecution::BeginRenderPassExecution>();
+		auto* recordingCommandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
+		recordingCommandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::BeginRenderPassExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
 			gfxExecutionPtr->m_RenderPassIndex = renderPassIndex;
 			gfxExecutionPtr->m_FramebufferIndex = m_FrontBufferIndexArray[0];
 			gfxExecutionPtr->m_FrameBufferColor = m_ColorBufferArray[0].GetImage();
 			gfxExecutionPtr->m_FrameBufferDepth = m_DepthBuffer.GetImage();
 			gfxExecutionPtr->m_RenderArea = { {0, 0}, {width, height} };
-			commandPtr->m_ExecutionPtr = gfxExecutionPtr;
-		}
-
-		{
-			auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
-			commandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
-
-			auto gfxExecutionPtr = VulkanGfxExecution::AllocateExecution<VulkanGfxExecution::BindPipelineExecution>();
+			});
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::BindPipelineExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
 			gfxExecutionPtr->m_PipelineIdentifier = g_PipelineIdentifier;
-			commandPtr->m_ExecutionPtr = gfxExecutionPtr;
-		}
-
-		{
-			auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
-			commandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
-
-			auto gfxExecutionPtr = VulkanGfxExecution::AllocateExecution<VulkanGfxExecution::PushConstantsExecution>();
+			});
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::PushConstantsExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
 			gfxExecutionPtr->m_PipelineIdentifier = g_PipelineIdentifier;
 
 			{
@@ -625,27 +596,14 @@ void VulkanGraphics::BuildRenderLoop()
 				size_t dataSize = sizeof(mainLightDirection);
 				gfxExecutionPtr->m_RawDataArrays[EVulkanShaderType::VERTEX].push_back(VulkanPushContstansRawData(dataPtr, dataPtr + dataSize));
 			}
-			
-			commandPtr->m_ExecutionPtr = gfxExecutionPtr;
-		}
-
-		{
-			auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
-			commandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
-
-			auto gfxExecutionPtr = VulkanGfxExecution::AllocateExecution<VulkanGfxExecution::BindDescriptorSetsExecution>();
+			});
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::BindDescriptorSetsExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
 			gfxExecutionPtr->m_PipelineIdentifier = g_PipelineIdentifier;
 			gfxExecutionPtr->m_DescriptorSetArray = std::vector<VkDescriptorSet>(m_ResourcePipelineMgr.GetDescriptorSetArray());
 			gfxExecutionPtr->m_GfxObjectUsage.m_ReadTextureArray.push_back(m_CharacterHeadTexture.GetImage());
 			gfxExecutionPtr->m_GfxObjectUsage.m_ReadTextureArray.push_back(m_CharacterBodyTexture.GetImage());
-			commandPtr->m_ExecutionPtr = gfxExecutionPtr;
-		}
-
-		{
-			auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
-			commandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
-
-			auto gfxExecutionPtr = VulkanGfxExecution::AllocateExecution<VulkanGfxExecution::DrawIndexedExectuion>();
+			});
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::DrawIndexedExectuion>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
 			gfxExecutionPtr->m_PipelineIdentifier = g_PipelineIdentifier;
 			gfxExecutionPtr->m_VertexBuffer = m_CharacterMesh.GetVertexBuffer();
 			gfxExecutionPtr->m_IndexBuffer = m_CharacterMesh.GetIndexBuffer();
@@ -654,20 +612,9 @@ void VulkanGraphics::BuildRenderLoop()
 			gfxExecutionPtr->m_InstanceCount = 1;
 			gfxExecutionPtr->m_GfxObjectUsage.m_ReadBufferArray.push_back(m_CharacterMesh.GetVertexBuffer());
 			gfxExecutionPtr->m_GfxObjectUsage.m_ReadBufferArray.push_back(m_CharacterMesh.GetIndexBuffer());
-			commandPtr->m_ExecutionPtr = gfxExecutionPtr;
-		}
-
-		{
-			auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
-			commandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
-			commandPtr->m_ExecutionPtr = VulkanGfxExecution::AllocateExecution<VulkanGfxExecution::EndRenderPassExecution>();
-		}
-
-		{
-			auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
-			commandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
-
-			auto gfxExecutionPtr = VulkanGfxExecution::AllocateExecution<VulkanGfxExecution::CopyImageExecution>();
+			});
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::EndRenderPassExecution>(recordingCommandPtr->m_ExecutionPtrArray, NULL);
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::CopyImageExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
 			gfxExecutionPtr->m_SourceImage = m_ColorBufferArray[0].GetImage();
 			gfxExecutionPtr->m_SourceLayoutFrom = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 			gfxExecutionPtr->m_SourceLayoutTo = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -680,12 +627,9 @@ void VulkanGraphics::BuildRenderLoop()
 			gfxExecutionPtr->m_DestinationAccessMaskTo = VK_ACCESS_SHADER_READ_BIT;
 			gfxExecutionPtr->m_Width = width;
 			gfxExecutionPtr->m_Height = height;
-			commandPtr->m_ExecutionPtr = gfxExecutionPtr;
-		}
+			});
 
-		{
-			auto commandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::BuildAllCommandBuffers>();
-		}
+		VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::BuildAllCommandBuffers>(NULL);
 	}
 
 	// Execute body commands

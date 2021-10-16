@@ -6,6 +6,7 @@
 #include <typeindex>
 #include <vector>
 #include <tuple>
+#include <functional>
 
 typedef std::vector<VkCommandBuffer> VulkanCommandBufferArray;
 typedef std::vector<size_t> IndexArray;
@@ -188,6 +189,19 @@ namespace VulkanGfxExecution
 		GetExecutionPool().erase(iter);
 
 		return executionPtr;
+	}
+
+	template <class TExecution>
+	void AllocateExecutionWithSetter(std::vector<ExecutionBase*>& outExecutionPtrArray, std::function<void (TExecution* gfxExecutionPtr)> funcSetter)
+	{
+		auto* gfxExecutionPtr = AllocateExecution<TExecution>();
+
+		if (funcSetter != NULL)
+		{
+			funcSetter(gfxExecutionPtr);
+		}
+
+		outExecutionPtrArray.push_back(gfxExecutionPtr);
 	}
 }
 
