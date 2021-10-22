@@ -16,11 +16,6 @@ public:
 		return s_PresentQueueFamilyIndex;
 	}
 
-	static const int& GetTransferQueueFamilyIndex()
-	{
-		return s_TransferQueueFamilyIndex;
-	}
-
 	static const int& GetComputeQueueFamilyIndex()
 	{
 		return s_ComputeQueueFamilyIndex;
@@ -80,11 +75,6 @@ public:
 		return s_QueueMap[s_PresentQueueFamilyIndex];
 	}
 
-	static const VkQueue& GetTransferQueue()
-	{
-		return s_QueueMap[s_TransferQueueFamilyIndex];
-	}
-
 	static const VkQueue& GetComputeQueue()
 	{
 		return s_QueueMap[s_ComputeQueueFamilyIndex];
@@ -95,7 +85,6 @@ private:
 	static int s_PhysicalDeviceIndex;
 	static int s_GraphicsQueueFamilyIndex;
 	static int s_PresentQueueFamilyIndex;
-	static int s_TransferQueueFamilyIndex;
 	static int s_ComputeQueueFamilyIndex;
 	static VkDevice s_LogicalDevice;
 	static VkPhysicalDeviceProperties s_PhysicalDeviceProperties;

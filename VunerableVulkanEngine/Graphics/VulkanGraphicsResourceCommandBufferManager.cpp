@@ -9,6 +9,22 @@
 
 VulkanGraphicsResourceCommandBufferManager g_Instance;
 
+const VkQueue& EVulkanCommandType::ToQueue(EVulkanCommandType::TYPE commandType)
+{
+	switch (commandType)
+	{
+	case EVulkanCommandType::GRAPHICS:
+		return VulkanGraphicsResourceDevice::GetGraphicsQueue();
+
+	case EVulkanCommandType::COMPUTE:
+		return VulkanGraphicsResourceDevice::GetComputeQueue();
+
+	default:
+		printf_console("[VulkanGraphics] failed to convert the command type(%d) into the actual queue\n", commandType);
+		throw;
+	}
+}
+
 void VulkanQueueSubmitNode::Initialize()
 {
 	m_SignalSemaphoreIdentifier = VulkanGraphicsResourceSemaphoreManager::GetInstance().AllocateIdentifier();
@@ -61,27 +77,7 @@ bool VulkanQueueSubmitNode::AggregateCommandBuffer(EVulkanCommandType::TYPE comm
 		}
 	}
 
-	VkQueue queue = VK_NULL_HANDLE;
-
-	switch (commandType)
-	{
-	case EVulkanCommandType::GRAPHICS:
-		queue = VulkanGraphicsResourceDevice::GetGraphicsQueue();
-		break;
-
-	case EVulkanCommandType::COMPUTE:
-		queue = VulkanGraphicsResourceDevice::GetComputeQueue();
-		break;
-
-	case EVulkanCommandType::TRANSFER:
-		queue = VulkanGraphicsResourceDevice::GetTransferQueue();
-		break;
-
-	default:
-		printf_console("[VulkanGraphics] failed to aggregate command buffers into a submission node\n");
-		throw;
-	}
-
+	const auto& queue = EVulkanCommandType::ToQueue(commandType);
 	m_AggregatedCommandBufferArrayMap[queue].push_back(commandBuffer);
 	m_AggregatedGfxObjectUsage.Aggregate(gfxObjectUsage);
 
@@ -204,6 +200,11 @@ namespace VulkanGfxExecution
 		gfxObjectUsage.Aggregate(m_GfxObjectUsage);
 	}
 
+	void EndRenderPassExecution::Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage)
+	{
+		vkCmdEndRenderPass(commandBuffer);
+	}
+
 	void CopyImageExecution::Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage)
 	{
 		auto imageBarrierArray = std::vector<VkImageMemoryBarrier>();
@@ -244,7 +245,7 @@ namespace VulkanGfxExecution
 			imageBarrierArray.push_back(imageBarrier);
 		}
 
-		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, imageBarrierArray.size(), imageBarrierArray.data());
+		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, imageBarrierArray.size(), imageBarrierArray.data());
 
 		auto imageRegion = VkImageCopy();
 		imageRegion.srcSubresource = VkImageSubresourceLayers{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
@@ -291,12 +292,61 @@ namespace VulkanGfxExecution
 			imageBarrierArray.push_back(imageBarrier);
 		}
 
-		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, imageBarrierArray.size(), imageBarrierArray.data());
+		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, imageBarrierArray.size(), imageBarrierArray.data());
+		gfxObjectUsage.m_ReadTextureArray.push_back(m_SourceImage);
+		gfxObjectUsage.m_WriteTextureArray.push_back(m_DestinationImage);
 	}
 
-	void EndRenderPassExecution::Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage)
+	void CopyBufferToImageExecution::Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage)
 	{
-		vkCmdEndRenderPass(commandBuffer);
+		auto imageBarrier = VkImageMemoryBarrier();
+		imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		imageBarrier.pNext = NULL;
+		imageBarrier.srcAccessMask = m_DestinationAccessMaskFrom;
+		imageBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		imageBarrier.oldLayout = m_DestinationLayoutFrom;
+		imageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		imageBarrier.image = m_DestinationImage;
+		imageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		imageBarrier.subresourceRange.baseMipLevel = 0;
+		imageBarrier.subresourceRange.levelCount = 1;
+		imageBarrier.subresourceRange.baseArrayLayer = 0;
+		imageBarrier.subresourceRange.layerCount = 1;
+		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &imageBarrier);
+
+		auto copyInfo = VkBufferImageCopy();
+		copyInfo.bufferOffset = 0;
+		copyInfo.bufferRowLength = 0;
+		copyInfo.bufferImageHeight = 0;
+		copyInfo.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		copyInfo.imageSubresource.mipLevel = 0;
+		copyInfo.imageSubresource.baseArrayLayer = 0;
+		copyInfo.imageSubresource.layerCount = 1;
+		copyInfo.imageOffset = { 0, 0, 0 };
+		copyInfo.imageExtent = { m_Width, m_Height, 1 };
+		vkCmdCopyBufferToImage(commandBuffer, m_SourceBuffer, m_DestinationImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyInfo);
+
+		imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		imageBarrier.pNext = NULL;
+		imageBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		imageBarrier.dstAccessMask = m_DestinationAccessMaskTo;
+		imageBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		imageBarrier.newLayout = m_DestinationLayoutTo;
+		imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		imageBarrier.image = m_DestinationImage;
+		imageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		imageBarrier.subresourceRange.baseMipLevel = 0;
+		imageBarrier.subresourceRange.levelCount = 1;
+		imageBarrier.subresourceRange.baseArrayLayer = 0;
+		imageBarrier.subresourceRange.layerCount = 1;
+		vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &imageBarrier);
+		gfxObjectUsage.m_ReadBufferArray.push_back(m_SourceBuffer);
+		gfxObjectUsage.m_WriteTextureArray.push_back(m_DestinationImage);
+
+		// for compatibility between access mask and pipeline stage flag, check table 4 in https://vulkan.lunarg.com/doc/view/1.2.162.1/windows/1.2-extensions/vkspec.html#synchronization-access-types-supported
 	}
 }
 
@@ -307,31 +357,33 @@ VulkanGraphicsResourceCommandBufferManager& VulkanGraphicsResourceCommandBufferM
 
 void VulkanGraphicsResourceCommandBufferManager::Initialize()
 {
+	m_IsDirty = true;
+
 	CreateSingleCommandPool(EVulkanCommandType::GRAPHICS, true);
 	CreateSingleCommandPool(EVulkanCommandType::COMPUTE, true);
-	CreateSingleCommandPool(EVulkanCommandType::TRANSFER, true);
 
 	CreateSingleCommandPool(EVulkanCommandType::GRAPHICS, false);
 	CreateSingleCommandPool(EVulkanCommandType::COMPUTE, false);
-	CreateSingleCommandPool(EVulkanCommandType::TRANSFER, false);
 }
 
 void VulkanGraphicsResourceCommandBufferManager::Deinitialize()
 {
+	m_IsDirty = true;
+
 	FreeAllStaticCommandBuffers();
 	FreeAllQueueSubmitNodes();
 	
 	DestroySingleCommandPool(EVulkanCommandType::GRAPHICS, true);
 	DestroySingleCommandPool(EVulkanCommandType::COMPUTE, true);
-	DestroySingleCommandPool(EVulkanCommandType::TRANSFER, true);
 
 	DestroySingleCommandPool(EVulkanCommandType::GRAPHICS, false);
 	DestroySingleCommandPool(EVulkanCommandType::COMPUTE, false);
-	DestroySingleCommandPool(EVulkanCommandType::TRANSFER, false);
 }
 
 VulkanCommandBufferOutputData VulkanGraphicsResourceCommandBufferManager::CreateResourcePhysically(const VulkanCommandBufferInputData& inputData)
 {
+	m_IsDirty = true;
+
 	auto outputData = VulkanCommandBufferOutputData();
 	outputData.m_CommandType = inputData.m_CommandType;
 	outputData.m_IsTransient = inputData.m_IsTransient;
@@ -343,6 +395,8 @@ VulkanCommandBufferOutputData VulkanGraphicsResourceCommandBufferManager::Create
 
 void VulkanGraphicsResourceCommandBufferManager::DestroyResourcePhysicially(const VulkanCommandBufferOutputData& outputData)
 {
+	m_IsDirty = true;
+
 	for (auto executionPtr : outputData.m_ExecutionPtrArray)
 	{
 		std::type_index typeIndex = typeid(executionPtr);
@@ -365,6 +419,8 @@ void VulkanGraphicsResourceCommandBufferManager::DestroyResourcePhysicially(cons
 
 void VulkanGraphicsResourceCommandBufferManager::FreeAllStaticCommandBuffers()
 {
+	m_IsDirty = true;
+
 	std::unordered_map<EVulkanCommandType::TYPE, VulkanCommandBufferArray> commandBufferArrayMap;
 
 	for (size_t i = m_ResourceArray.size(); i > 0; --i)
@@ -400,18 +456,16 @@ void VulkanGraphicsResourceCommandBufferManager::FreeAllStaticCommandBuffers()
 	}
 }
 
-void VulkanGraphicsResourceCommandBufferManager::FreeAllQueueSubmitNodes()
-{
-	for (auto& node : m_QueueSubmitNodeArray)
-	{
-		node.Deinitialize();
-	}
-
-	m_QueueSubmitNodeArray.clear();
-}
-
 void VulkanGraphicsResourceCommandBufferManager::BuildAll()
 {
+	if (!m_IsDirty)
+	{
+		return;
+	}
+
+	m_IsDirty = false;
+	FreeAllQueueSubmitNodes();
+
 	// Calculate how many command buffers we need
 	std::unordered_map<EVulkanCommandType::TYPE, IndexArray> staticResourceIndexArrayMap;
 	std::unordered_map<EVulkanCommandType::TYPE, IndexArray> transientResourceIndexArrayMap;
@@ -450,7 +504,7 @@ void VulkanGraphicsResourceCommandBufferManager::BuildAll()
 	auto sortedOutputDataArray = std::vector<VulkanCommandBufferOutputData>(m_ResourceArray);
 	std::sort(sortedOutputDataArray.begin(), sortedOutputDataArray.end(), [](const auto& lhs, const auto& rhs) -> bool
 	{
-		return lhs.m_SortOrder < lhs.m_SortOrder;
+		return lhs.m_SortOrder < rhs.m_SortOrder;
 	});
 
 	// Generate queue submit data array
@@ -467,12 +521,12 @@ void VulkanGraphicsResourceCommandBufferManager::BuildAll()
 			continue;
 		}
 
+		++aggregateIndex;
 		m_QueueSubmitNodeArray.push_back(VulkanQueueSubmitNode());
 		m_QueueSubmitNodeArray[aggregateIndex].Initialize();
-		++aggregateIndex;
-		node = m_QueueSubmitNodeArray[aggregateIndex];
+		auto& newNode = m_QueueSubmitNodeArray[aggregateIndex];
 
-		if (node.AggregateCommandBuffer(outputData.m_CommandType, outputData.m_RecordedCommandBuffer, outputData.m_RecordedGfxObjectUsage) == false)
+		if (newNode.AggregateCommandBuffer(outputData.m_CommandType, outputData.m_RecordedCommandBuffer, outputData.m_RecordedGfxObjectUsage) == false)
 		{
 			printf_console("[VulkanGraphics] failed to aggregate command buffers\n");
 
@@ -487,7 +541,7 @@ void VulkanGraphicsResourceCommandBufferManager::BuildAll()
 
 		for (auto& pair : node.m_AggregatedCommandBufferArrayMap)
 		{
-			auto& commandBufferArray = pair.second;
+			auto& commandBufferArray = node.m_AggregatedCommandBufferArrayMap[pair.first];
 			auto& submitInfo = node.m_ResultSubmitInfoMap[pair.first];
 			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			submitInfo.pNext = NULL;
@@ -506,23 +560,12 @@ void VulkanGraphicsResourceCommandBufferManager::BuildAll()
 			submitInfo.pSignalSemaphores = &node.GetSemaphore();
 		}
 	}
-
-	// Remove all transient requests
-	for (size_t i = m_ResourceArray.size(); i > 0; --i)
-	{
-		auto& outputData = m_ResourceArray[i - 1];
-
-		if (!outputData.m_IsTransient)
-		{
-			continue;
-		}
-
-		DestroyResourceByDirectIndex(i);
-	}
 }
 
 void VulkanGraphicsResourceCommandBufferManager::SubmitAll(const std::vector<VkSemaphore>& additionalWaitSemaphoreArray)
 {
+	bool isFirstNode = true;
+
 	// Submit here??? or seperately in a different function????
 	for (size_t i = 0; i < m_QueueSubmitNodeArray.size(); ++i)
 	{
@@ -544,13 +587,18 @@ void VulkanGraphicsResourceCommandBufferManager::SubmitAll(const std::vector<VkS
 				}
 			}
 			
-			if (additionalWaitSemaphoreArray.size() > 0)
+			if (isFirstNode)
 			{
-				waitSemaphoreArray.insert(waitSemaphoreArray.end(), additionalWaitSemaphoreArray.begin(), additionalWaitSemaphoreArray.end());
+				isFirstNode = false;
 
-				for (size_t j = 0; j < additionalWaitSemaphoreArray.size(); ++j)
+				if (additionalWaitSemaphoreArray.size() > 0)
 				{
-					waitDstStageMaskArray.push_back(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+					waitSemaphoreArray.insert(waitSemaphoreArray.end(), additionalWaitSemaphoreArray.begin(), additionalWaitSemaphoreArray.end());
+
+					for (size_t j = 0; j < additionalWaitSemaphoreArray.size(); ++j)
+					{
+						waitDstStageMaskArray.push_back(VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+					}
 				}
 			}
 
@@ -558,6 +606,17 @@ void VulkanGraphicsResourceCommandBufferManager::SubmitAll(const std::vector<VkS
 			submitInfo.pWaitSemaphores = waitSemaphoreArray.data();
 			submitInfo.pWaitDstStageMask = waitDstStageMaskArray.data();
 			vkQueueSubmit(pair.first, 1, &submitInfo, VK_NULL_HANDLE);
+		}
+	}
+
+	// Remove all transient requests
+	for (size_t i = m_ResourceArray.size(); i > 0; --i)
+	{
+		auto& outputData = m_ResourceArray[i - 1];
+
+		if (outputData.m_IsTransient)
+		{
+			DestroyResourceByDirectIndex(i - 1);
 		}
 	}
 }
@@ -589,10 +648,6 @@ void VulkanGraphicsResourceCommandBufferManager::CreateSingleCommandPool(EVulkan
 
 		case EVulkanCommandType::COMPUTE:
 			createInfo.queueFamilyIndex = VulkanGraphicsResourceDevice::GetComputeQueueFamilyIndex();
-			break;
-
-		case EVulkanCommandType::TRANSFER:
-			createInfo.queueFamilyIndex = VulkanGraphicsResourceDevice::GetTransferQueueFamilyIndex();
 			break;
 
 		default:
@@ -643,13 +698,12 @@ void VulkanGraphicsResourceCommandBufferManager::AllocateAndRecordCommandBuffer(
 	{
 		if (countArray[(EVulkanCommandType::TYPE)iType] == 0)
 		{
-			return;
+			continue;
 		}
 
 		auto commandBufferArray = std::vector<VkCommandBuffer>();
-		int offset = commandBufferArray.size();
 		size_t count = countArray[(EVulkanCommandType::TYPE)iType];
-		commandBufferArray.resize(offset + count);
+		commandBufferArray.resize(count);
 
 		auto indexArray = resourceIndexArrayMap[(EVulkanCommandType::TYPE)iType];
 		auto allocateInfo = VkCommandBufferAllocateInfo();
@@ -658,14 +712,14 @@ void VulkanGraphicsResourceCommandBufferManager::AllocateAndRecordCommandBuffer(
 		allocateInfo.commandPool = m_ResourceArray[indexArray[0]].m_IsTransient ? m_TransientCommandPoolMap[(EVulkanCommandType::TYPE)iType] : m_StaticCommandPoolMap[(EVulkanCommandType::TYPE)iType];
 		allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 		allocateInfo.commandBufferCount = count;
-		vkAllocateCommandBuffers(VulkanGraphicsResourceDevice::GetLogicalDevice(), &allocateInfo, commandBufferArray.data() + offset);
+		vkAllocateCommandBuffers(VulkanGraphicsResourceDevice::GetLogicalDevice(), &allocateInfo, commandBufferArray.data());
 
 		auto flags = m_ResourceArray[indexArray[0]].m_IsTransient ? VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT : VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 
 		for (size_t i = 0; i < count; ++i)
 		{
 			auto& outputData = m_ResourceArray[indexArray[i]];
-			outputData.m_RecordedCommandBuffer = commandBufferArray[offset + i];
+			outputData.m_RecordedCommandBuffer = commandBufferArray[i];
 
 			// Record the current command buffer???
 			auto beginInfo = VkCommandBufferBeginInfo();
@@ -673,16 +727,53 @@ void VulkanGraphicsResourceCommandBufferManager::AllocateAndRecordCommandBuffer(
 			beginInfo.pNext = NULL;
 			beginInfo.flags = flags;
 			beginInfo.pInheritanceInfo = NULL; // No secondary buffer
-			vkBeginCommandBuffer(outputData.m_RecordedCommandBuffer, &beginInfo);
+
+			auto result = vkBeginCommandBuffer(outputData.m_RecordedCommandBuffer, &beginInfo);
+
+			if (result)
+			{
+				printf_console("[VulkanGraphics] failed to begin the command buffer with error code %d\n", result);
+
+				throw;
+			}
 
 			for (auto executionPtr : outputData.m_ExecutionPtrArray)
 			{
 				executionPtr->Execute(outputData.m_RecordedCommandBuffer, outputData.m_RecordedGfxObjectUsage);
 			}
 
-			vkEndCommandBuffer(outputData.m_RecordedCommandBuffer);
+			result = vkEndCommandBuffer(outputData.m_RecordedCommandBuffer);
+
+			if (result)
+			{
+				printf_console("[VulkanGraphics] failed to end the command buffer with error code %d\n", result);
+
+				throw;
+			}
 		}
 	}
+}
+
+void VulkanGraphicsResourceCommandBufferManager::FreeAllQueueSubmitNodes()
+{
+	for (int i = 0; i < EVulkanCommandType::MAX; ++i)
+	{
+		auto result = vkQueueWaitIdle(EVulkanCommandType::ToQueue((EVulkanCommandType::TYPE)i));
+
+		if (result)
+		{
+			printf_console("[VulkanGraphics] failed to wait the queue until idle state with error code %d\n", result);
+
+			throw;
+		}
+	}
+
+	for (auto& node : m_QueueSubmitNodeArray)
+	{
+		node.Deinitialize();
+	}
+
+	m_QueueSubmitNodeArray.clear();
 }
 
 

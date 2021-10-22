@@ -211,13 +211,19 @@ void VulkanGraphicsResourceManagerBase<TResource, TInputData, TResourceKey>::Des
 
 		if (directIndex != lastIndex)
 		{
+			std::vector<std::pair<size_t, size_t>> identifierToIndexPairArray;
 			range = m_IndexToIdentifiersMap.equal_range(lastIndex);
 
 			for (auto iter = range.first; iter != range.second;)
 			{
 				m_IdentifierToIndexMap[iter->second] = directIndex;
-				m_IndexToIdentifiersMap.insert(std::pair<size_t, size_t>(directIndex, iter->second));
+				identifierToIndexPairArray.push_back(std::pair<size_t, size_t>(directIndex, iter->second));
 				iter = m_IndexToIdentifiersMap.erase(iter);
+			}
+
+			for (auto pair : identifierToIndexPairArray)
+			{
+				m_IndexToIdentifiersMap.insert(pair);
 			}
 
 			m_ResourceArray[directIndex] = m_ResourceArray[lastIndex];

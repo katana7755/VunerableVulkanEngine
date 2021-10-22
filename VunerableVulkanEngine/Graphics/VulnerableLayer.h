@@ -110,12 +110,6 @@ namespace VulnerableCommand
 		void Execute() override;
 	};
 
-	struct BuildAllCommandBuffers : public BodyCommand
-	{
-	private:
-		void Execute() override;
-	};
-
 	// TODO: this needs to be reimplemted too...especially for how we handle additional wait semaphores...
 	struct SubmitAllCommandBuffers : public BodyCommand
 	{

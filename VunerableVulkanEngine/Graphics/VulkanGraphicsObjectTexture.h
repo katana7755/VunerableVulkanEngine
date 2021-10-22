@@ -14,6 +14,21 @@ public:
 		return m_Image;
 	}
 
+	const VkBuffer& GetStagingBuffer()
+	{
+		return m_StagingBuffer;
+	}
+
+	const uint32_t& GetWidth()
+	{
+		return m_Width;
+	}
+
+	const uint32_t& GetHeight()
+	{
+		return m_Height;
+	}
+
 	// TODO: need to support MipMap
 	// TODO: need to support MSAA
 	void CreateAsColorBuffer();
@@ -21,8 +36,9 @@ public:
 	void CreateAsDepthBuffer();
 	void CreateAsTexture(const char* strPngPath);
 	bool IsStagingBufferExist() { return m_IsStagingBufferExist; };
+	void ResetStagingBufferExist() { m_IsStagingBufferExist = false; };
 	void ApplyStagingBuffer(VkCommandBuffer& commandBuffer);
-	void ClearStagingBuffer();
+	void TryToClearStagingBuffer();
 
 	// TODO: what else in various texture types do we need to support?
 

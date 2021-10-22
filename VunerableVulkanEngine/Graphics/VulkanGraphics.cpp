@@ -153,78 +153,58 @@ void VulkanGraphics::Invalidate()
 
 void VulkanGraphics::TransferAllStagingBuffers()
 {
-	if (!m_CharacterHeadTexture.IsStagingBufferExist())
+	if (!m_CharacterHeadTexture.IsStagingBufferExist() && !m_CharacterBodyTexture.IsStagingBufferExist())
 	{
+		m_CharacterHeadTexture.TryToClearStagingBuffer();
+		m_CharacterBodyTexture.TryToClearStagingBuffer();
+
 		return;
 	}
 
-	if (!m_CharacterBodyTexture.IsStagingBufferExist())
+	// ***** TODO: still need to figure out how properly we can handle transfering resources *****
+	// 1) transfer queue isn't necessary to be seperate, so just making graphic_transfer and compute_transfer will be fine...
+	// 2) removing transient command buffers should be repositioned after sumbiting queues...
+	size_t commandBufferIdentifier = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().AllocateIdentifier();
+
+	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateCommandBuffer>([&](auto* commandPtr) {
+		commandPtr->m_Identifier = commandBufferIdentifier;
+		commandPtr->m_InputData.m_CommandType = EVulkanCommandType::GRAPHICS; // graphics and compute queue both have transfer functionality, so it isn't necessary to use the specific transfer queue...
+		commandPtr->m_InputData.m_IsTransient = true;
+		commandPtr->m_InputData.m_SortOrder = 0;
+		});
+
+	auto* recordingCommandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
+	recordingCommandPtr->m_Identifier = commandBufferIdentifier;
+
+	if (m_CharacterHeadTexture.IsStagingBufferExist())
 	{
-		return;
+		m_CharacterHeadTexture.ResetStagingBufferExist();
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::CopyBufferToImageExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
+			gfxExecutionPtr->m_SourceBuffer = m_CharacterHeadTexture.GetStagingBuffer();
+			gfxExecutionPtr->m_DestinationImage = m_CharacterHeadTexture.GetImage();
+			gfxExecutionPtr->m_DestinationLayoutFrom = VK_IMAGE_LAYOUT_UNDEFINED;
+			gfxExecutionPtr->m_DestinationLayoutTo = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			gfxExecutionPtr->m_DestinationAccessMaskFrom = 0;
+			gfxExecutionPtr->m_DestinationAccessMaskTo = VK_ACCESS_SHADER_READ_BIT;
+			gfxExecutionPtr->m_Width = m_CharacterHeadTexture.GetWidth();
+			gfxExecutionPtr->m_Height = m_CharacterHeadTexture.GetHeight();
+			});
 	}
 
-	auto commandBuffer = m_ResourceCommandBufferMgr.AllocateAdditionalCommandBuffer();
-	auto commandBufferArray = m_ResourceCommandBufferMgr.GetAllAdditionalCommandBuffers();
-
-	auto beginInfo = VkCommandBufferBeginInfo();
-	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	beginInfo.pNext = NULL;
-	beginInfo.flags = NULL;
-	beginInfo.pInheritanceInfo = NULL; // TODO: use this when building a secondary command buffer...(NECESSARY!!!)
-
-	auto result = vkBeginCommandBuffer(commandBuffer, &beginInfo);
-
-	if (result)
+	if (m_CharacterBodyTexture.IsStagingBufferExist())
 	{
-		printf_console("[VulkanGraphics] failed to begin a command buffer with error code %d\n", result);
-
-		throw;
+		m_CharacterBodyTexture.ResetStagingBufferExist();
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::CopyBufferToImageExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
+			gfxExecutionPtr->m_SourceBuffer = m_CharacterBodyTexture.GetStagingBuffer();
+			gfxExecutionPtr->m_DestinationImage = m_CharacterBodyTexture.GetImage();
+			gfxExecutionPtr->m_DestinationLayoutFrom = VK_IMAGE_LAYOUT_UNDEFINED;
+			gfxExecutionPtr->m_DestinationLayoutTo = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			gfxExecutionPtr->m_DestinationAccessMaskFrom = 0;
+			gfxExecutionPtr->m_DestinationAccessMaskTo = VK_ACCESS_SHADER_READ_BIT;
+			gfxExecutionPtr->m_Width = m_CharacterBodyTexture.GetWidth();
+			gfxExecutionPtr->m_Height = m_CharacterBodyTexture.GetHeight();
+			});
 	}
-
-	m_CharacterHeadTexture.ApplyStagingBuffer(commandBuffer);
-	m_CharacterBodyTexture.ApplyStagingBuffer(commandBuffer);
-
-	result = vkEndCommandBuffer(commandBuffer);
-
-	if (result)
-	{
-		printf_console("[VulkanGraphics] failed to record a command buffer with error code %d\n", result);
-
-		throw;
-	}
-
-	auto submitInfo = VkSubmitInfo();
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.pNext = NULL;
-	submitInfo.waitSemaphoreCount = 0;
-	submitInfo.pWaitSemaphores = NULL;
-	submitInfo.pWaitDstStageMask = NULL;
-	submitInfo.commandBufferCount = commandBufferArray.size(); // TODO: in the future think about submitting multiple queues simultaneously...
-	submitInfo.pCommandBuffers = commandBufferArray.data();
-	submitInfo.signalSemaphoreCount = 0;
-	submitInfo.pSignalSemaphores = NULL;
-
-	result = vkQueueSubmit(m_ResourceDevice.GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-
-	if (result)
-	{
-		printf_console("[VulkanGraphics] failed to submit a queue with error code %d\n", result);
-
-		throw;
-	}
-
-	result = vkQueueWaitIdle(m_ResourceDevice.GetGraphicsQueue());
-
-	if (result)
-	{
-		printf_console("[VulkanGraphics] failed to wait a queue with error code %d\n", result);
-
-		throw;
-	}
-
-	m_ResourceCommandBufferMgr.ClearAdditionalCommandBuffers();
-	m_CharacterHeadTexture.ClearStagingBuffer();
-	m_CharacterBodyTexture.ClearStagingBuffer();
 }
 
 void VulkanGraphics::InitializeFrame()
@@ -234,10 +214,10 @@ void VulkanGraphics::InitializeFrame()
 
 void VulkanGraphics::SubmitPrimary()
 {
-	TransferAllStagingBuffers();
-
 	auto acquireNextImageSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_AcquireNextImageSemaphoreIndex);
 	VulkanGraphicsResourceSwapchain::AcquireNextImage(acquireNextImageSemaphore, VK_NULL_HANDLE);
+
+	TransferAllStagingBuffers();
 	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::SubmitAllCommandBuffers>([&](auto* commandPtr) {
 		commandPtr->m_WaitSemaphoreArray.push_back(acquireNextImageSemaphore);
 		});
@@ -567,11 +547,12 @@ void VulkanGraphics::BuildRenderLoop()
 			commandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
 			commandPtr->m_InputData.m_CommandType = EVulkanCommandType::GRAPHICS;
 			commandPtr->m_InputData.m_IsTransient = false;
-			commandPtr->m_InputData.m_SortOrder = 0;
+			commandPtr->m_InputData.m_SortOrder = 1;
 			});
 
 		auto* recordingCommandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
 		recordingCommandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
+
 		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::BeginRenderPassExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
 			gfxExecutionPtr->m_RenderPassIndex = renderPassIndex;
 			gfxExecutionPtr->m_FramebufferIndex = m_FrontBufferIndexArray[0];
@@ -628,8 +609,6 @@ void VulkanGraphics::BuildRenderLoop()
 			gfxExecutionPtr->m_Width = width;
 			gfxExecutionPtr->m_Height = height;
 			});
-
-		VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::BuildAllCommandBuffers>(NULL);
 	}
 
 	// Execute body commands

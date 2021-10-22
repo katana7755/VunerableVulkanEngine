@@ -78,6 +78,8 @@ void VulkanGraphicsObjectTexture::ApplyStagingBuffer(VkCommandBuffer& commandBuf
 		return;
 	}
 
+	m_IsStagingBufferExist = false;
+
 	auto imageBarrier = VkImageMemoryBarrier();
 	imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	imageBarrier.pNext = NULL;
@@ -124,13 +126,18 @@ void VulkanGraphicsObjectTexture::ApplyStagingBuffer(VkCommandBuffer& commandBuf
 	vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &imageBarrier);
 }
 
-void VulkanGraphicsObjectTexture::ClearStagingBuffer()
+void VulkanGraphicsObjectTexture::TryToClearStagingBuffer()
 {
-	if (m_IsStagingBufferExist)
+	if (m_StagingMemory != VK_NULL_HANDLE)
 	{
-		m_IsStagingBufferExist = false;
 		vkFreeMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_StagingMemory, NULL);
+		m_StagingMemory = VK_NULL_HANDLE;
+	}
+	
+	if (m_StagingBuffer != VK_NULL_HANDLE)
+	{
 		vkDestroyBuffer(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_StagingBuffer, NULL);
+		m_StagingBuffer = VK_NULL_HANDLE;
 	}
 }
 
@@ -300,7 +307,7 @@ bool VulkanGraphicsObjectTexture::CreateInternal()
 
 bool VulkanGraphicsObjectTexture::DestroyInternal()
 {
-	ClearStagingBuffer();
+	TryToClearStagingBuffer();
 	vkDestroyImageView(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_ImageView, NULL);
 	vkFreeMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_ImageMemory, NULL);
 	vkDestroyImage(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_Image, NULL);

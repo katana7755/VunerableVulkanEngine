@@ -21,10 +21,11 @@ namespace EVulkanCommandType
 
 		GRAPHICS,
 		COMPUTE, 
-		TRANSFER,
 
 		MAX,
 	};
+
+	const VkQueue& ToQueue(TYPE type);
 };
 
 class VulkanGraphicsResourceCommandBufferManager;
@@ -135,6 +136,12 @@ namespace VulkanGfxExecution
 		void Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage) override;
 	};
 
+	struct EndRenderPassExecution : ExecutionBase
+	{
+	private:
+		void Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage) override;
+	};
+
 	// TODO: currently only handling color images, but in the future other image type will be supported
 	// TODO: it is necessary to implement abstract image class which contains every status values such as a layout and a access mask
 	struct CopyImageExecution : ExecutionBase
@@ -156,8 +163,18 @@ namespace VulkanGfxExecution
 		void Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage) override;
 	};
 
-	struct EndRenderPassExecution : ExecutionBase
+	// TODO: this needs to be reimplemented...
+	struct CopyBufferToImageExecution : ExecutionBase
 	{
+		VkBuffer		m_SourceBuffer;
+		VkImage			m_DestinationImage;
+		VkImageLayout	m_DestinationLayoutFrom;
+		VkImageLayout	m_DestinationLayoutTo;
+		VkAccessFlags	m_DestinationAccessMaskFrom;
+		VkAccessFlags	m_DestinationAccessMaskTo;
+		uint32_t		m_Width;
+		uint32_t		m_Height;
+
 	private:
 		void Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage) override;
 	};
@@ -237,7 +254,6 @@ protected:
 
 public:
 	void FreeAllStaticCommandBuffers();
-	void FreeAllQueueSubmitNodes();
 	void BuildAll();
 	void SubmitAll(const std::vector<VkSemaphore>& additionalWaitSemaphoreArray);
 	VkSemaphore GetSemaphoreForSubmission();
@@ -247,11 +263,13 @@ private:
 	void DestroySingleCommandPool(EVulkanCommandType::TYPE commandType, bool isTransient);
 	void ReserveIndexForCommandBuffer(EVulkanCommandType::TYPE commandType, int index, std::unordered_map<EVulkanCommandType::TYPE, IndexArray>& resourceIndexArrayMap, size_t countArray[EVulkanCommandType::MAX]);
 	void AllocateAndRecordCommandBuffer(std::unordered_map<EVulkanCommandType::TYPE, IndexArray>& resourceIndexArrayMap, const size_t countArray[EVulkanCommandType::MAX]);
+	void FreeAllQueueSubmitNodes();
 
 private:
 	std::unordered_map<EVulkanCommandType::TYPE, VkCommandPool>	m_StaticCommandPoolMap;
 	std::unordered_map<EVulkanCommandType::TYPE, VkCommandPool>	m_TransientCommandPoolMap;
 	std::vector<VulkanQueueSubmitNode>							m_QueueSubmitNodeArray;
+	bool														m_IsDirty; // when we need to rebuild command buffers...
 };
 
 class OldVulkanGraphicsResourceCommandBufferManager : public VulkanGraphicsResourceBase

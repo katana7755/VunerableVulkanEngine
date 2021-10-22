@@ -53,14 +53,9 @@ namespace VulnerableCommand
 		VulkanGraphicsResourceCommandBufferManager::GetInstance().DestroyResource(m_Identifier);
 	}
 
-	void BuildAllCommandBuffers::Execute()
-	{
-		VulkanGraphicsResourceCommandBufferManager::GetInstance().FreeAllQueueSubmitNodes();
-		VulkanGraphicsResourceCommandBufferManager::GetInstance().BuildAll();
-	}
-
 	void SubmitAllCommandBuffers::Execute()
 	{
+		VulkanGraphicsResourceCommandBufferManager::GetInstance().BuildAll();
 		VulkanGraphicsResourceCommandBufferManager::GetInstance().SubmitAll(m_WaitSemaphoreArray);
 	}
 };
