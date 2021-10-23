@@ -7,8 +7,11 @@
 #include "../DebugUtility.h"
 #include "glm/gtc/matrix_transform.hpp"
 
+#include "../IMGUI/imgui.h"
+#include "../IMGUI/imgui_impl_win32.h"
 #include "../IMGUI/imgui_impl_vulkan.h"
 #include "../Editor/EditorGameView.h"
+#include "../Editor/EditorManager.h"
 
 #include "VulnerableUploadBufferManager.h"
 #include "VulnerableLayer.h"
@@ -24,6 +27,20 @@ size_t g_fragmentShaderIdentifier = -1;
 size_t g_PipelineIdentifier = -1;
 size_t g_RenderingCommandBufferIdentifier = -1;
 
+int gImGuiRenderPassIndex = -1;
+int gImGuiDescriptorPoolIndex = -1;
+bool gImGuiFontUpdated = false;
+
+void check_vk_result(VkResult err)
+{
+	if (err == 0)
+		return;
+
+	printf_console("[vulkan] Error: VkResult = %d\n", err);
+
+	throw;
+}
+
 VulkanGraphics::VulkanGraphics()
 {
 	m_ResourceInstance.Create();
@@ -31,12 +48,10 @@ VulkanGraphics::VulkanGraphics()
 
 VulkanGraphics::~VulkanGraphics()
 {
-	EditorGameView::SetTexture(NULL, NULL);
-
 	vkDeviceWaitIdle(VulkanGraphicsResourceDevice::GetLogicalDevice());
-
+	DeinitializeGUI();
+	EditorGameView::SetTexture(NULL, NULL);
 	VulnerableLayer::Deinitialize();
-
 	m_MVPMatrixUniformBuffer.Destroy();
 
 	for (auto colorBuffer : m_ColorBufferArray)
@@ -46,6 +61,7 @@ VulkanGraphics::~VulkanGraphics()
 
 	m_ColorBufferArray.clear();
 	m_DepthBuffer.Destroy();
+	m_ColorBufferSampler.Destroy();
 	m_CharacterHeadSampler.Destroy();
 	m_CharacterHeadTexture.Destroy();
 	m_CharacterBodySampler.Destroy();
@@ -77,6 +93,7 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 	m_CharacterHeadSampler.Create();
 	m_CharacterBodyTexture.CreateAsTexture("../PNGs/free_male_1_body_diffuse.png");
 	m_CharacterBodySampler.Create();
+	m_ColorBufferSampler.Create();
 	m_DepthBuffer.CreateAsDepthBuffer();
 	m_MVPMatrixUniformBuffer.Create();
 
@@ -92,6 +109,7 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 	VulnerableLayer::Initialize();
 
 	BuildRenderLoop();
+	InitializeGUI(hWnd);
 }
 #endif
 
@@ -120,6 +138,7 @@ void VulkanGraphics::Invalidate()
 
 	m_ColorBufferArray.clear();
 	m_DepthBuffer.Destroy();
+	m_ColorBufferSampler.Destroy();
 	m_CharacterHeadSampler.Destroy();
 	m_CharacterHeadTexture.Destroy();
 	m_CharacterBodySampler.Destroy();
@@ -140,6 +159,7 @@ void VulkanGraphics::Invalidate()
 	m_CharacterHeadSampler.Create();
 	m_CharacterBodyTexture.CreateAsTexture("../PNGs/free_male_1_body_diffuse.png");
 	m_CharacterBodySampler.Create();
+	m_ColorBufferSampler.Create();
 	m_DepthBuffer.CreateAsDepthBuffer();
 	m_MVPMatrixUniformBuffer.Create();
 
@@ -149,62 +169,6 @@ void VulkanGraphics::Invalidate()
 	m_QueueSubmitAdditionalSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
 
 	BuildRenderLoop();
-}
-
-void VulkanGraphics::TransferAllStagingBuffers()
-{
-	if (!m_CharacterHeadTexture.IsStagingBufferExist() && !m_CharacterBodyTexture.IsStagingBufferExist())
-	{
-		m_CharacterHeadTexture.TryToClearStagingBuffer();
-		m_CharacterBodyTexture.TryToClearStagingBuffer();
-
-		return;
-	}
-
-	// ***** TODO: still need to figure out how properly we can handle transfering resources *****
-	// 1) transfer queue isn't necessary to be seperate, so just making graphic_transfer and compute_transfer will be fine...
-	// 2) removing transient command buffers should be repositioned after sumbiting queues...
-	size_t commandBufferIdentifier = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().AllocateIdentifier();
-
-	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateCommandBuffer>([&](auto* commandPtr) {
-		commandPtr->m_Identifier = commandBufferIdentifier;
-		commandPtr->m_InputData.m_CommandType = EVulkanCommandType::GRAPHICS; // graphics and compute queue both have transfer functionality, so it isn't necessary to use the specific transfer queue...
-		commandPtr->m_InputData.m_IsTransient = true;
-		commandPtr->m_InputData.m_SortOrder = 0;
-		});
-
-	auto* recordingCommandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
-	recordingCommandPtr->m_Identifier = commandBufferIdentifier;
-
-	if (m_CharacterHeadTexture.IsStagingBufferExist())
-	{
-		m_CharacterHeadTexture.ResetStagingBufferExist();
-		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::CopyBufferToImageExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
-			gfxExecutionPtr->m_SourceBuffer = m_CharacterHeadTexture.GetStagingBuffer();
-			gfxExecutionPtr->m_DestinationImage = m_CharacterHeadTexture.GetImage();
-			gfxExecutionPtr->m_DestinationLayoutFrom = VK_IMAGE_LAYOUT_UNDEFINED;
-			gfxExecutionPtr->m_DestinationLayoutTo = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			gfxExecutionPtr->m_DestinationAccessMaskFrom = 0;
-			gfxExecutionPtr->m_DestinationAccessMaskTo = VK_ACCESS_SHADER_READ_BIT;
-			gfxExecutionPtr->m_Width = m_CharacterHeadTexture.GetWidth();
-			gfxExecutionPtr->m_Height = m_CharacterHeadTexture.GetHeight();
-			});
-	}
-
-	if (m_CharacterBodyTexture.IsStagingBufferExist())
-	{
-		m_CharacterBodyTexture.ResetStagingBufferExist();
-		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::CopyBufferToImageExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
-			gfxExecutionPtr->m_SourceBuffer = m_CharacterBodyTexture.GetStagingBuffer();
-			gfxExecutionPtr->m_DestinationImage = m_CharacterBodyTexture.GetImage();
-			gfxExecutionPtr->m_DestinationLayoutFrom = VK_IMAGE_LAYOUT_UNDEFINED;
-			gfxExecutionPtr->m_DestinationLayoutTo = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			gfxExecutionPtr->m_DestinationAccessMaskFrom = 0;
-			gfxExecutionPtr->m_DestinationAccessMaskTo = VK_ACCESS_SHADER_READ_BIT;
-			gfxExecutionPtr->m_Width = m_CharacterBodyTexture.GetWidth();
-			gfxExecutionPtr->m_Height = m_CharacterBodyTexture.GetHeight();
-			});
-	}
 }
 
 void VulkanGraphics::InitializeFrame()
@@ -224,57 +188,10 @@ void VulkanGraphics::SubmitPrimary()
 
 	// Execute body commands
 	VulnerableLayer::ExecuteAllCommands();
-}
 
-void VulkanGraphics::SubmitAdditional()
-{
-	auto queueSubmitAdditionalSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_QueueSubmitAdditionalSemaphoreIndex);
-	auto imageIndex = VulkanGraphicsResourceSwapchain::GetAcquiredImageIndex();
 
-	std::vector<VkSemaphore> waitSemaphoreArray;
-	{
-		waitSemaphoreArray.push_back(VulkanGraphicsResourceCommandBufferManager::GetInstance().GetSemaphoreForSubmission());
-	}
-
-	std::vector<VkPipelineStageFlags> waitDstStageMaskArray;
-	{
-		waitDstStageMaskArray.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-	}
-
-	std::vector<VkCommandBuffer> commandBufferArray;
-	{
-		auto additionalCommandBuffers = m_ResourceCommandBufferMgr.GetAllAdditionalCommandBuffers();
-
-		for (auto commandBuffer : additionalCommandBuffers)
-		{
-			commandBufferArray.push_back(commandBuffer);
-		}
-	}
-
-	std::vector<VkSemaphore> signalSemaphoreArray;
-	{
-		signalSemaphoreArray.push_back(queueSubmitAdditionalSemaphore);
-	}
-
-	auto submitInfo = VkSubmitInfo();
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.pNext = NULL;
-	submitInfo.waitSemaphoreCount = waitSemaphoreArray.size();
-	submitInfo.pWaitSemaphores = waitSemaphoreArray.data();
-	submitInfo.pWaitDstStageMask = waitDstStageMaskArray.data();
-	submitInfo.commandBufferCount = commandBufferArray.size(); // TODO: in the future think about submitting multiple queues simultaneously...
-	submitInfo.pCommandBuffers = commandBufferArray.data();
-	submitInfo.signalSemaphoreCount = signalSemaphoreArray.size();
-	submitInfo.pSignalSemaphores = signalSemaphoreArray.data();
-
-	auto result = vkQueueSubmit(m_ResourceDevice.GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-
-	if (result)
-	{
-		printf_console("[VulkanGraphics] failed to submit a queue with error code %d\n", result);
-
-		throw;
-	}
+	// TODO: after chaging GUI logic to use new command buffer manager, the below function will be repositioned to be right after the Transfer function
+	DrawGUI();
 }
 
 void VulkanGraphics::PresentFrame()
@@ -350,17 +267,6 @@ void VulkanGraphics::BeginRenderPass(const VkCommandBuffer& commandBuffer, int r
 void VulkanGraphics::EndRenderPass(const VkCommandBuffer& commandBuffer)
 {
 	vkCmdEndRenderPass(commandBuffer);
-}
-
-void VulkanGraphics::DoTest()
-{
-	auto imageInfo = VkDescriptorImageInfo();
-	imageInfo.sampler = m_CharacterHeadSampler.GetSampler();
-	imageInfo.imageView = m_ColorBufferArray[1].GetImageView();
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-	auto descriptorSet = ImGui_ImplVulkan_AddTexture(imageInfo);
-	EditorGameView::SetTexture(m_ColorBufferArray[1].GetImage(), descriptorSet);
 }
 
 void VulkanGraphics::BuildRenderLoop()
@@ -613,6 +519,382 @@ void VulkanGraphics::BuildRenderLoop()
 
 	// Execute body commands
 	VulnerableLayer::ExecuteAllCommands();
+}
+
+void VulkanGraphics::TransferAllStagingBuffers()
+{
+	if (!m_CharacterHeadTexture.IsStagingBufferExist() && !m_CharacterBodyTexture.IsStagingBufferExist())
+	{
+		m_CharacterHeadTexture.TryToClearStagingBuffer();
+		m_CharacterBodyTexture.TryToClearStagingBuffer();
+
+		return;
+	}
+
+	// ***** TODO: still need to figure out how properly we can handle transfering resources *****
+	// 1) transfer queue isn't necessary to be seperate, so just making graphic_transfer and compute_transfer will be fine...
+	// 2) removing transient command buffers should be repositioned after sumbiting queues...
+	size_t commandBufferIdentifier = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().AllocateIdentifier();
+
+	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateCommandBuffer>([&](auto* commandPtr) {
+		commandPtr->m_Identifier = commandBufferIdentifier;
+		commandPtr->m_InputData.m_CommandType = EVulkanCommandType::GRAPHICS; // graphics and compute queue both have transfer functionality, so it isn't necessary to use the specific transfer queue...
+		commandPtr->m_InputData.m_IsTransient = true;
+		commandPtr->m_InputData.m_SortOrder = 0;
+		});
+
+	auto* recordingCommandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
+	recordingCommandPtr->m_Identifier = commandBufferIdentifier;
+
+	if (m_CharacterHeadTexture.IsStagingBufferExist())
+	{
+		m_CharacterHeadTexture.ResetStagingBufferExist();
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::CopyBufferToImageExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
+			gfxExecutionPtr->m_SourceBuffer = m_CharacterHeadTexture.GetStagingBuffer();
+			gfxExecutionPtr->m_DestinationImage = m_CharacterHeadTexture.GetImage();
+			gfxExecutionPtr->m_DestinationLayoutFrom = VK_IMAGE_LAYOUT_UNDEFINED;
+			gfxExecutionPtr->m_DestinationLayoutTo = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			gfxExecutionPtr->m_DestinationAccessMaskFrom = 0;
+			gfxExecutionPtr->m_DestinationAccessMaskTo = VK_ACCESS_SHADER_READ_BIT;
+			gfxExecutionPtr->m_Width = m_CharacterHeadTexture.GetWidth();
+			gfxExecutionPtr->m_Height = m_CharacterHeadTexture.GetHeight();
+			});
+	}
+
+	if (m_CharacterBodyTexture.IsStagingBufferExist())
+	{
+		m_CharacterBodyTexture.ResetStagingBufferExist();
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::CopyBufferToImageExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
+			gfxExecutionPtr->m_SourceBuffer = m_CharacterBodyTexture.GetStagingBuffer();
+			gfxExecutionPtr->m_DestinationImage = m_CharacterBodyTexture.GetImage();
+			gfxExecutionPtr->m_DestinationLayoutFrom = VK_IMAGE_LAYOUT_UNDEFINED;
+			gfxExecutionPtr->m_DestinationLayoutTo = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			gfxExecutionPtr->m_DestinationAccessMaskFrom = 0;
+			gfxExecutionPtr->m_DestinationAccessMaskTo = VK_ACCESS_SHADER_READ_BIT;
+			gfxExecutionPtr->m_Width = m_CharacterBodyTexture.GetWidth();
+			gfxExecutionPtr->m_Height = m_CharacterBodyTexture.GetHeight();
+			});
+	}
+}
+
+#ifdef _WIN32
+void VulkanGraphics::InitializeGUI(HWND hWnd)
+{
+	std::vector<VkAttachmentDescription> attachmentDescArray;
+	{
+		auto desc = VkAttachmentDescription();
+		desc.flags = 0;
+		desc.format = VulkanGraphicsResourceSwapchain::GetSwapchainFormat();
+		desc.samples = VK_SAMPLE_COUNT_1_BIT; // TODO: need to be modified when starting to consider msaa...(NECESSARY!!!)
+		desc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		desc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		attachmentDescArray.push_back(desc);
+	}
+	{
+		auto desc = VkAttachmentDescription();
+		desc.flags = 0;
+		desc.format = VK_FORMAT_D32_SFLOAT; // TODO: need to define depth format (NECESSARY!!!)
+		desc.samples = VK_SAMPLE_COUNT_1_BIT; // TODO: need to be modified when starting to consider msaa...(NECESSARY!!!)
+		desc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		desc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		attachmentDescArray.push_back(desc);
+	}
+
+	// TODO: think about optimizable use-cases of subpass...one can be postprocess...
+	std::vector<VkSubpassDescription> subPassDescArray;
+	std::vector<VkAttachmentReference> subPassInputAttachmentArray;
+	std::vector<VkAttachmentReference> subPassColorAttachmentArray;
+	auto subPassDepthStencilAttachment = VkAttachmentReference();
+	std::vector<uint32_t> subPassPreserveAttachmentArray;
+	{
+		// subPassInputAttachmentArray
+		{
+			// TODO: find out when we have to use this...
+		}
+
+		// subPassColorAttachmentArray
+		{
+			auto ref = VkAttachmentReference();
+			ref.attachment = 0;
+			ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			subPassColorAttachmentArray.push_back(ref);
+		}
+
+		subPassDepthStencilAttachment.attachment = 1;
+		subPassDepthStencilAttachment.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+		// subPassPreserveAttachmentArray
+		{
+			// TODO: find out when we have to use this...
+		}
+
+		auto desc = VkSubpassDescription();
+		desc.flags = 0; // TODO: subpass has various flags...need to check what these all are for...
+		desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS; // TODO: one day we need to implement compute pipeline as well...(NECESSARY!!!)
+		desc.inputAttachmentCount = subPassInputAttachmentArray.size();
+		desc.pInputAttachments = subPassInputAttachmentArray.data();
+		desc.colorAttachmentCount = subPassColorAttachmentArray.size();
+		desc.pColorAttachments = subPassColorAttachmentArray.data();
+		desc.pResolveAttachments = NULL; // TODO: msaa...(NECESSARY!!!)
+		desc.pDepthStencilAttachment = &subPassDepthStencilAttachment;
+		desc.preserveAttachmentCount = subPassPreserveAttachmentArray.size();
+		desc.pPreserveAttachments = subPassPreserveAttachmentArray.data();
+		subPassDescArray.push_back(desc);
+	}
+
+	// TODO: still it's not perfectly clear... let's study more on this...
+	std::vector<VkSubpassDependency> subPassDepArray;
+	{
+		auto dep = VkSubpassDependency();
+		dep.srcSubpass = VK_SUBPASS_EXTERNAL;
+		dep.dstSubpass = 0;
+		dep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		dep.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		dep.srcAccessMask = 0;
+		dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		dep.dependencyFlags = 0;
+		subPassDepArray.push_back(dep);
+	}
+
+	gImGuiRenderPassIndex = VulkanGraphicsResourceRenderPassManager::CreateRenderPass(attachmentDescArray, subPassDescArray, subPassDepArray);
+
+	auto poolSizeArray = std::vector<VkDescriptorPoolSize>();
+	{
+		auto poolSize = VkDescriptorPoolSize();
+		poolSize.type = VK_DESCRIPTOR_TYPE_SAMPLER;
+		poolSize.descriptorCount = 10;
+		poolSizeArray.push_back(poolSize);
+	}
+	{
+		auto poolSize = VkDescriptorPoolSize();
+		poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		poolSize.descriptorCount = 10;
+		poolSizeArray.push_back(poolSize);
+	}
+	{
+		auto poolSize = VkDescriptorPoolSize();
+		poolSize.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+		poolSize.descriptorCount = 10;
+		poolSizeArray.push_back(poolSize);
+	}
+	{
+		auto poolSize = VkDescriptorPoolSize();
+		poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		poolSize.descriptorCount = 10;
+		poolSizeArray.push_back(poolSize);
+	}
+	{
+		auto poolSize = VkDescriptorPoolSize();
+		poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+		poolSize.descriptorCount = 10;
+		poolSizeArray.push_back(poolSize);
+	}
+	{
+		auto poolSize = VkDescriptorPoolSize();
+		poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+		poolSize.descriptorCount = 10;
+		poolSizeArray.push_back(poolSize);
+	}
+	{
+		auto poolSize = VkDescriptorPoolSize();
+		poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		poolSize.descriptorCount = 10;
+		poolSizeArray.push_back(poolSize);
+	}
+	{
+		auto poolSize = VkDescriptorPoolSize();
+		poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		poolSize.descriptorCount = 10;
+		poolSizeArray.push_back(poolSize);
+	}
+	{
+		auto poolSize = VkDescriptorPoolSize();
+		poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		poolSize.descriptorCount = 10;
+		poolSizeArray.push_back(poolSize);
+	}
+	{
+		auto poolSize = VkDescriptorPoolSize();
+		poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+		poolSize.descriptorCount = 10;
+		poolSizeArray.push_back(poolSize);
+	}
+	{
+		auto poolSize = VkDescriptorPoolSize();
+		poolSize.type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+		poolSize.descriptorCount = 10;
+		poolSizeArray.push_back(poolSize);
+	}
+
+	gImGuiDescriptorPoolIndex = VulkanGraphicsResourcePipelineManager::CreateDescriptorPool(poolSizeArray);
+
+	auto descriptorPool = VulkanGraphicsResourcePipelineManager::GetDescriptorPool(gImGuiDescriptorPoolIndex);
+
+	//gImGuiWindow.Surface = VulkanGraphicsResourceSurface::GetSurface();
+	//gImGuiWindow.SurfaceFormat = VkSurfaceFormatKHR { VK_FORMAT_R8G8B8A8_UNORM, VK_COLORSPACE_SRGB_NONLINEAR_KHR };
+	//gImGuiWindow.PresentMode = VK_PRESENT_MODE_FIFO_KHR;
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	ImGui::StyleColorsDark();
+	ImGui_ImplWin32_Init(hWnd);
+
+	ImGui_ImplVulkan_InitInfo init_info = {};
+	init_info.Instance = VulkanGraphicsResourceInstance::GetInstance();
+	init_info.PhysicalDevice = VulkanGraphicsResourceDevice::GetPhysicalDevice();
+	init_info.Device = VulkanGraphicsResourceDevice::GetLogicalDevice();
+	init_info.QueueFamily = VulkanGraphicsResourceDevice::GetGraphicsQueueFamilyIndex();
+	init_info.Queue = VulkanGraphicsResourceDevice::GetGraphicsQueue();
+	init_info.PipelineCache = VulkanGraphicsResourcePipelineManager::GetPipelineCache();
+	init_info.DescriptorPool = descriptorPool;
+	init_info.Allocator = NULL;
+	init_info.MinImageCount = 2;
+	init_info.ImageCount = VulkanGraphicsResourceSwapchain::GetImageViewCount();
+	init_info.CheckVkResultFn = check_vk_result;
+	ImGui_ImplVulkan_Init(&init_info, VulkanGraphicsResourceRenderPassManager::GetRenderPass(gImGuiRenderPassIndex)); // TODO: will we need to make an individual render pass?
+	gImGuiFontUpdated = false;
+
+	auto imageInfo = VkDescriptorImageInfo();
+	imageInfo.sampler = m_ColorBufferSampler.GetSampler();
+	imageInfo.imageView = m_ColorBufferArray[1].GetImageView();
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	auto descriptorSet = ImGui_ImplVulkan_AddTexture(imageInfo);
+	EditorGameView::SetTexture(m_ColorBufferArray[1].GetImage(), descriptorSet);
+}
+#endif
+
+void VulkanGraphics::DeinitializeGUI()
+{
+	ImGui_ImplVulkan_Shutdown();
+	ImGui::DestroyContext();
+	gImGuiFontUpdated = false;
+	VulkanGraphicsResourcePipelineManager::DestroyDescriptorPool(gImGuiDescriptorPoolIndex);
+	VulkanGraphicsResourceRenderPassManager::DestroyRenderPass(gImGuiRenderPassIndex);
+	gImGuiDescriptorPoolIndex = -1;
+	gImGuiRenderPassIndex = -1;
+}
+
+void VulkanGraphics::DrawGUI()
+{
+	// Upload Fonts
+	if (!gImGuiFontUpdated)
+	{
+		gImGuiFontUpdated = true;
+
+		// Use any command queue
+		auto command_buffer = OldVulkanGraphicsResourceCommandBufferManager::AllocateAdditionalCommandBuffer();
+		VkCommandBufferBeginInfo begin_info = {};
+		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		begin_info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+		auto err = vkBeginCommandBuffer(command_buffer, &begin_info);
+		check_vk_result(err);
+		ImGui_ImplVulkan_CreateFontsTexture(command_buffer);
+
+		VkSubmitInfo end_info = {};
+		end_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		end_info.commandBufferCount = 1;
+		end_info.pCommandBuffers = &command_buffer;
+		err = vkEndCommandBuffer(command_buffer);
+		check_vk_result(err);
+		err = vkQueueSubmit(VulkanGraphicsResourceDevice::GetGraphicsQueue(), 1, &end_info, VK_NULL_HANDLE);
+		check_vk_result(err);
+
+		err = vkDeviceWaitIdle(VulkanGraphicsResourceDevice::GetLogicalDevice());
+		check_vk_result(err);
+		ImGui_ImplVulkan_DestroyFontUploadObjects();
+		OldVulkanGraphicsResourceCommandBufferManager::ClearAdditionalCommandBuffers();
+	}
+
+	// Start the Dear ImGui frame
+	ImGui_ImplVulkan_NewFrame();
+	ImGui_ImplWin32_NewFrame();
+	ImGui::NewFrame();
+	EditorManager::DrawEditors();
+
+	// Rendering
+	ImGui::Render();
+	ImDrawData* draw_data = ImGui::GetDrawData();
+	const bool is_minimized = (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f);
+
+	if (!is_minimized)
+	{
+		auto command_buffer = OldVulkanGraphicsResourceCommandBufferManager::AllocateAdditionalCommandBuffer();
+		VkCommandBufferBeginInfo begin_info = {};
+		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		begin_info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+		auto err = vkBeginCommandBuffer(command_buffer, &begin_info);
+		check_vk_result(err);
+		BeginRenderPass(command_buffer, gImGuiRenderPassIndex);
+
+		// Record dear imgui primitives into command buffer
+		ImGui_ImplVulkan_RenderDrawData(draw_data, command_buffer);
+
+		EndRenderPass(command_buffer);
+		err = vkEndCommandBuffer(command_buffer);
+		check_vk_result(err);
+	}
+
+
+	// Submit Additional...
+	auto queueSubmitAdditionalSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_QueueSubmitAdditionalSemaphoreIndex);
+	auto imageIndex = VulkanGraphicsResourceSwapchain::GetAcquiredImageIndex();
+
+	std::vector<VkSemaphore> waitSemaphoreArray;
+	{
+		waitSemaphoreArray.push_back(VulkanGraphicsResourceCommandBufferManager::GetInstance().GetSemaphoreForSubmission());
+	}
+
+	std::vector<VkPipelineStageFlags> waitDstStageMaskArray;
+	{
+		waitDstStageMaskArray.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+	}
+
+	std::vector<VkCommandBuffer> commandBufferArray;
+	{
+		auto additionalCommandBuffers = m_ResourceCommandBufferMgr.GetAllAdditionalCommandBuffers();
+
+		for (auto commandBuffer : additionalCommandBuffers)
+		{
+			commandBufferArray.push_back(commandBuffer);
+		}
+	}
+
+	std::vector<VkSemaphore> signalSemaphoreArray;
+	{
+		signalSemaphoreArray.push_back(queueSubmitAdditionalSemaphore);
+	}
+
+	auto submitInfo = VkSubmitInfo();
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.pNext = NULL;
+	submitInfo.waitSemaphoreCount = waitSemaphoreArray.size();
+	submitInfo.pWaitSemaphores = waitSemaphoreArray.data();
+	submitInfo.pWaitDstStageMask = waitDstStageMaskArray.data();
+	submitInfo.commandBufferCount = commandBufferArray.size(); // TODO: in the future think about submitting multiple queues simultaneously...
+	submitInfo.pCommandBuffers = commandBufferArray.data();
+	submitInfo.signalSemaphoreCount = signalSemaphoreArray.size();
+	submitInfo.pSignalSemaphores = signalSemaphoreArray.data();
+
+	auto result = vkQueueSubmit(m_ResourceDevice.GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+
+	if (result)
+	{
+		printf_console("[VulkanGraphics] failed to submit a queue with error code %d\n", result);
+
+		throw;
+	}
 }
 
 void VulkanGraphics::CreateDescriptorSet()

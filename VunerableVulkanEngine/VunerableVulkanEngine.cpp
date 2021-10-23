@@ -4,10 +4,7 @@
 #include "framework.h"
 #include "VunerableVulkanEngine.h"
 #include "Graphics/VulkanGraphics.h"
-#include "IMGUI/imgui.h"
 #include "IMGUI/imgui_impl_win32.h"
-#include "IMGUI/imgui_impl_vulkan.h"
-#include "Editor/EditorManager.h"
 
 #define MAX_LOADSTRING 100
 
@@ -23,283 +20,6 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
 VulkanGraphics* gGraphicsPtr = NULL;
-int gImGuiRenderPassIndex = -1;
-int gImGuiDescriptorPoolIndex = -1;
-bool gImGuiFontUpdated = false;
-
-void check_vk_result(VkResult err)
-{
-    if (err == 0)
-        return;
-
-    printf_console("[vulkan] Error: VkResult = %d\n", err);
-
-    throw;
-}
-
-void InitializeImGui(HWND hWnd)
-{
-    std::vector<VkAttachmentDescription> attachmentDescArray;
-    {
-        auto desc = VkAttachmentDescription();
-        desc.flags = 0;
-        desc.format = VulkanGraphicsResourceSwapchain::GetSwapchainFormat();
-        desc.samples = VK_SAMPLE_COUNT_1_BIT; // TODO: need to be modified when starting to consider msaa...(NECESSARY!!!)
-        desc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        desc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-        attachmentDescArray.push_back(desc);
-    }
-    {
-        auto desc = VkAttachmentDescription();
-        desc.flags = 0;
-        desc.format = VK_FORMAT_D32_SFLOAT; // TODO: need to define depth format (NECESSARY!!!)
-        desc.samples = VK_SAMPLE_COUNT_1_BIT; // TODO: need to be modified when starting to consider msaa...(NECESSARY!!!)
-        desc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        desc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        attachmentDescArray.push_back(desc);
-    }
-
-    // TODO: think about optimizable use-cases of subpass...one can be postprocess...
-    std::vector<VkSubpassDescription> subPassDescArray;
-    std::vector<VkAttachmentReference> subPassInputAttachmentArray;
-    std::vector<VkAttachmentReference> subPassColorAttachmentArray;
-    auto subPassDepthStencilAttachment = VkAttachmentReference();
-    std::vector<uint32_t> subPassPreserveAttachmentArray;
-    {
-        // subPassInputAttachmentArray
-        {
-            // TODO: find out when we have to use this...
-        }
-
-        // subPassColorAttachmentArray
-        {
-            auto ref = VkAttachmentReference();
-            ref.attachment = 0;
-            ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            subPassColorAttachmentArray.push_back(ref);
-        }
-
-        subPassDepthStencilAttachment.attachment = 1;
-        subPassDepthStencilAttachment.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-        // subPassPreserveAttachmentArray
-        {
-            // TODO: find out when we have to use this...
-        }
-
-        auto desc = VkSubpassDescription();
-        desc.flags = 0; // TODO: subpass has various flags...need to check what these all are for...
-        desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS; // TODO: one day we need to implement compute pipeline as well...(NECESSARY!!!)
-        desc.inputAttachmentCount = subPassInputAttachmentArray.size();
-        desc.pInputAttachments = subPassInputAttachmentArray.data();
-        desc.colorAttachmentCount = subPassColorAttachmentArray.size();
-        desc.pColorAttachments = subPassColorAttachmentArray.data();
-        desc.pResolveAttachments = NULL; // TODO: msaa...(NECESSARY!!!)
-        desc.pDepthStencilAttachment = &subPassDepthStencilAttachment;
-        desc.preserveAttachmentCount = subPassPreserveAttachmentArray.size();
-        desc.pPreserveAttachments = subPassPreserveAttachmentArray.data();
-        subPassDescArray.push_back(desc);
-    }
-
-    // TODO: still it's not perfectly clear... let's study more on this...
-    std::vector<VkSubpassDependency> subPassDepArray;
-    {
-        auto dep = VkSubpassDependency();
-        dep.srcSubpass = VK_SUBPASS_EXTERNAL;
-        dep.dstSubpass = 0;
-        dep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dep.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dep.srcAccessMask = 0;
-        dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        dep.dependencyFlags = 0;
-        subPassDepArray.push_back(dep);
-    }
-
-    gImGuiRenderPassIndex = VulkanGraphicsResourceRenderPassManager::CreateRenderPass(attachmentDescArray, subPassDescArray, subPassDepArray);
-
-    auto poolSizeArray = std::vector<VkDescriptorPoolSize>();
-    {
-        auto poolSize = VkDescriptorPoolSize();
-        poolSize.type = VK_DESCRIPTOR_TYPE_SAMPLER;
-        poolSize.descriptorCount = 100;
-        poolSizeArray.push_back(poolSize);
-    }
-    {
-        auto poolSize = VkDescriptorPoolSize();
-        poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSize.descriptorCount = 100;
-        poolSizeArray.push_back(poolSize);
-    }
-    {
-        auto poolSize = VkDescriptorPoolSize();
-        poolSize.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-        poolSize.descriptorCount = 100;
-        poolSizeArray.push_back(poolSize);
-    }
-    {
-        auto poolSize = VkDescriptorPoolSize();
-        poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        poolSize.descriptorCount = 100;
-        poolSizeArray.push_back(poolSize);
-    }
-    {
-        auto poolSize = VkDescriptorPoolSize();
-        poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
-        poolSize.descriptorCount = 100;
-        poolSizeArray.push_back(poolSize);
-    }
-    {
-        auto poolSize = VkDescriptorPoolSize();
-        poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
-        poolSize.descriptorCount = 100;
-        poolSizeArray.push_back(poolSize);
-    }
-    {
-        auto poolSize = VkDescriptorPoolSize();
-        poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        poolSize.descriptorCount = 100;
-        poolSizeArray.push_back(poolSize);
-    }
-    {
-        auto poolSize = VkDescriptorPoolSize();
-        poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        poolSize.descriptorCount = 100;
-        poolSizeArray.push_back(poolSize);
-    }
-    {
-        auto poolSize = VkDescriptorPoolSize();
-        poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-        poolSize.descriptorCount = 100;
-        poolSizeArray.push_back(poolSize);
-    }
-    {
-        auto poolSize = VkDescriptorPoolSize();
-        poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-        poolSize.descriptorCount = 100;
-        poolSizeArray.push_back(poolSize);
-    }
-    {
-        auto poolSize = VkDescriptorPoolSize();
-        poolSize.type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-        poolSize.descriptorCount = 100;
-        poolSizeArray.push_back(poolSize);
-    }
-
-    gImGuiDescriptorPoolIndex = VulkanGraphicsResourcePipelineManager::CreateDescriptorPool(poolSizeArray);
-
-    auto descriptorPool = VulkanGraphicsResourcePipelineManager::GetDescriptorPool(gImGuiDescriptorPoolIndex);
-
-    //gImGuiWindow.Surface = VulkanGraphicsResourceSurface::GetSurface();
-    //gImGuiWindow.SurfaceFormat = VkSurfaceFormatKHR { VK_FORMAT_R8G8B8A8_UNORM, VK_COLORSPACE_SRGB_NONLINEAR_KHR };
-    //gImGuiWindow.PresentMode = VK_PRESENT_MODE_FIFO_KHR;
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    ImGui::StyleColorsDark();
-    ImGui_ImplWin32_Init(hWnd);
-
-    ImGui_ImplVulkan_InitInfo init_info = {};
-    init_info.Instance = VulkanGraphicsResourceInstance::GetInstance();
-    init_info.PhysicalDevice = VulkanGraphicsResourceDevice::GetPhysicalDevice();
-    init_info.Device = VulkanGraphicsResourceDevice::GetLogicalDevice();
-    init_info.QueueFamily = VulkanGraphicsResourceDevice::GetGraphicsQueueFamilyIndex();
-    init_info.Queue = VulkanGraphicsResourceDevice::GetGraphicsQueue();
-    init_info.PipelineCache = VulkanGraphicsResourcePipelineManager::GetPipelineCache();
-    init_info.DescriptorPool = descriptorPool;
-    init_info.Allocator = NULL;
-    init_info.MinImageCount = 2;
-    init_info.ImageCount = VulkanGraphicsResourceSwapchain::GetImageViewCount();
-    init_info.CheckVkResultFn = check_vk_result;
-    ImGui_ImplVulkan_Init(&init_info, VulkanGraphicsResourceRenderPassManager::GetRenderPass(gImGuiRenderPassIndex)); // TODO: will we need to make an individual render pass?
-    gImGuiFontUpdated = false;
-
-    gGraphicsPtr->DoTest();
-}
-
-void DeinitializeImGui()
-{
-    auto err = vkDeviceWaitIdle(VulkanGraphicsResourceDevice::GetLogicalDevice());
-    check_vk_result(err);
-    ImGui_ImplVulkan_Shutdown();
-    ImGui::DestroyContext();
-    gImGuiFontUpdated = false;
-    VulkanGraphicsResourcePipelineManager::DestroyDescriptorPool(gImGuiDescriptorPoolIndex);
-    VulkanGraphicsResourceRenderPassManager::DestroyRenderPass(gImGuiRenderPassIndex);
-    gImGuiDescriptorPoolIndex = -1;
-    gImGuiRenderPassIndex = -1;
-}
-
-void DrawImGuiFrame()
-{
-    // Upload Fonts
-    if (!gImGuiFontUpdated)
-    {
-        gImGuiFontUpdated = true;
-
-        // Use any command queue
-        auto command_buffer = OldVulkanGraphicsResourceCommandBufferManager::AllocateAdditionalCommandBuffer();
-        VkCommandBufferBeginInfo begin_info = {};
-        begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        begin_info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-        auto err = vkBeginCommandBuffer(command_buffer, &begin_info);
-        check_vk_result(err);
-        ImGui_ImplVulkan_CreateFontsTexture(command_buffer);
-
-        VkSubmitInfo end_info = {};
-        end_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        end_info.commandBufferCount = 1;
-        end_info.pCommandBuffers = &command_buffer;
-        err = vkEndCommandBuffer(command_buffer);
-        check_vk_result(err);
-        err = vkQueueSubmit(VulkanGraphicsResourceDevice::GetGraphicsQueue(), 1, &end_info, VK_NULL_HANDLE);
-        check_vk_result(err);
-
-        err = vkDeviceWaitIdle(VulkanGraphicsResourceDevice::GetLogicalDevice());
-        check_vk_result(err);
-        ImGui_ImplVulkan_DestroyFontUploadObjects();
-        OldVulkanGraphicsResourceCommandBufferManager::ClearAdditionalCommandBuffers();
-    }
-
-    // Start the Dear ImGui frame
-    ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplWin32_NewFrame();
-    ImGui::NewFrame();
-    EditorManager::DrawEditors();
-
-    // Rendering
-    ImGui::Render();
-    ImDrawData* draw_data = ImGui::GetDrawData();
-    const bool is_minimized = (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f);
-
-    if (!is_minimized)
-    {
-        auto command_buffer = OldVulkanGraphicsResourceCommandBufferManager::AllocateAdditionalCommandBuffer();
-        VkCommandBufferBeginInfo begin_info = {};
-        begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        begin_info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-        auto err = vkBeginCommandBuffer(command_buffer, &begin_info);
-        check_vk_result(err);
-        gGraphicsPtr->BeginRenderPass(command_buffer, gImGuiRenderPassIndex);
-
-        // Record dear imgui primitives into command buffer
-        ImGui_ImplVulkan_RenderDrawData(draw_data, command_buffer);
-
-        gGraphicsPtr->EndRenderPass(command_buffer);
-        err = vkEndCommandBuffer(command_buffer);
-        check_vk_result(err);
-    }
-}
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -339,8 +59,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         {
             gGraphicsPtr->InitializeFrame();
             gGraphicsPtr->SubmitPrimary();
-            DrawImGuiFrame();
-            gGraphicsPtr->SubmitAdditional();
             gGraphicsPtr->PresentFrame();
         }
     }  
@@ -400,7 +118,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    UpdateWindow(hWnd);
    gGraphicsPtr = new VulkanGraphics();
    gGraphicsPtr->Initialize(hInstance, hWnd);
-   InitializeImGui(hWnd);
 
    return TRUE;
 }
@@ -451,8 +168,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         break;
     case WM_DESTROY:
-        DeinitializeImGui();
-
         if (gGraphicsPtr != NULL)
         {
             delete gGraphicsPtr;

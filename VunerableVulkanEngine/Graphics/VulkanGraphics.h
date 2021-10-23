@@ -24,18 +24,24 @@ public:
 #endif
 
 	void Invalidate();
-	void TransferAllStagingBuffers();
 	void InitializeFrame();
 	void SubmitPrimary();
-	void SubmitAdditional();
 	void PresentFrame();
 	void BeginRenderPass(const VkCommandBuffer& commandBuffer, int renderPassIndex);
 	void EndRenderPass(const VkCommandBuffer& commandBuffer);
-	void DoTest();
 
 private:
 	void BuildRenderLoop();
+	void TransferAllStagingBuffers();
 
+#ifdef _WIN32
+	void InitializeGUI(HWND hWnd);
+#endif
+
+	void DeinitializeGUI();
+	void DrawGUI();
+
+private:
 	VulkanGraphicsResourceInstance m_ResourceInstance;
 	VulkanGraphicsResourceSurface m_ResourceSurface;
 	VulkanGraphicsResourceDevice m_ResourceDevice;
@@ -50,6 +56,7 @@ private:
 	VulkanGraphicsObjectTexture m_CharacterBodyTexture;
 	VulkanGraphicsObjectSampler m_CharacterBodySampler;
 	std::vector<VulkanGraphicsObjectTexture> m_ColorBufferArray;
+	VulkanGraphicsObjectSampler m_ColorBufferSampler;
 	VulkanGraphicsObjectTexture m_DepthBuffer;
 	VulkanGraphicsObjectUniformBuffer m_MVPMatrixUniformBuffer;
 
