@@ -179,6 +179,20 @@ namespace VulkanGfxExecution
 		void Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage) override;
 	};
 
+	struct GUICreateFontTexturesExecution : ExecutionBase
+	{
+	private:
+		void Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage) override;
+	};
+
+	struct GUIRenderDrawDataExecution : ExecutionBase
+	{
+		void* m_DrawDataPtr;
+
+	private:
+		void Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage) override;
+	};	
+
 	typedef std::unordered_multimap<std::type_index, ExecutionBase*> ExecutionPoolType;
 
 	ExecutionPoolType& GetExecutionPool();
@@ -270,34 +284,4 @@ private:
 	std::unordered_map<EVulkanCommandType::TYPE, VkCommandPool>	m_TransientCommandPoolMap;
 	std::vector<VulkanQueueSubmitNode>							m_QueueSubmitNodeArray;
 	bool														m_IsDirty; // when we need to rebuild command buffers...
-};
-
-class OldVulkanGraphicsResourceCommandBufferManager : public VulkanGraphicsResourceBase
-{
-public:
-	static const VkCommandPool& GetCommandPool()
-	{
-		return s_CommandGraphicsPool;
-	}
-
-public:
-	static void AllocatePrimaryBufferArray();
-	static void FreePrimaryBufferArray();
-	static const VkCommandBuffer& GetPrimaryCommandBuffer(int index);
-	static const VkCommandBuffer& AllocateAdditionalCommandBuffer();
-	static void FreeAdditionalCommandBuffer(const VkCommandBuffer& commandBuffer);
-	static const std::vector<VkCommandBuffer>& GetAllAdditionalCommandBuffers();
-	static void ClearAdditionalCommandBuffers();
-
-private:
-	static VkCommandPool s_CommandGraphicsPool;
-	static std::vector<VkCommandBuffer> s_PrimaryBufferArray;
-	static std::vector<VkCommandBuffer> s_AdditionalBufferArray;
-	
-
-protected:
-	virtual bool CreateInternal() override;
-	virtual bool DestroyInternal() override;
-
-private:
 };

@@ -1,5 +1,6 @@
 #include "VulnerableLayer.h"
 #include "VulnerableUploadBufferManager.h"
+#include "../IMGUI/imgui_impl_vulkan.h"
 
 #define COMMAND_QUEUE_COUNT 2
 
@@ -9,7 +10,12 @@ std::queue<VulnerableCommand::BodyCommand*> g_BodyCommandQueues[COMMAND_QUEUE_CO
 int g_CurrentCommandQueueIndex = 0;
 
 namespace VulnerableCommand
-{
+{	
+	void ClearAllTemporaryResources::Execute()
+	{
+		ImGui_ImplVulkan_DestroyFontUploadObjects();
+	}
+
 	void CreateShader::Execute()
 	{
 		VulkanGraphicsResourceShaderManager::GetInstance().CreateResource(m_Identifier, m_UploadBufferID, m_MetaData);

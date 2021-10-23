@@ -6,6 +6,7 @@
 #include "VulkanGraphicsResourceGraphicsPipelineManager.h"
 #include "VulkanGraphicsResourcePipelineLayoutManager.h"
 #include <algorithm>
+#include "../IMGUI/imgui_impl_vulkan.h"
 
 VulkanGraphicsResourceCommandBufferManager g_Instance;
 
@@ -347,6 +348,17 @@ namespace VulkanGfxExecution
 		gfxObjectUsage.m_WriteTextureArray.push_back(m_DestinationImage);
 
 		// for compatibility between access mask and pipeline stage flag, check table 4 in https://vulkan.lunarg.com/doc/view/1.2.162.1/windows/1.2-extensions/vkspec.html#synchronization-access-types-supported
+	}
+
+	void GUICreateFontTexturesExecution::Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage)
+	{
+		ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
+		ImGui_ImplVulkan_CollectResourceUsageInfoForFonts(gfxObjectUsage);
+	}
+
+	void GUIRenderDrawDataExecution::Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage)
+	{
+		ImGui_ImplVulkan_RenderDrawData((ImDrawData*)m_DrawDataPtr, commandBuffer);
 	}
 }
 
@@ -774,129 +786,4 @@ void VulkanGraphicsResourceCommandBufferManager::FreeAllQueueSubmitNodes()
 	}
 
 	m_QueueSubmitNodeArray.clear();
-}
-
-
-VkCommandPool OldVulkanGraphicsResourceCommandBufferManager::s_CommandGraphicsPool;
-std::vector<VkCommandBuffer> OldVulkanGraphicsResourceCommandBufferManager::s_PrimaryBufferArray;
-std::vector<VkCommandBuffer> OldVulkanGraphicsResourceCommandBufferManager::s_AdditionalBufferArray;
-
-void OldVulkanGraphicsResourceCommandBufferManager::AllocatePrimaryBufferArray()
-{
-	int count = VulkanGraphicsResourceSwapchain::GetImageViewCount();
-	s_PrimaryBufferArray.resize(count);
-
-	auto allocateInfo = VkCommandBufferAllocateInfo();
-	allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocateInfo.pNext = NULL;
-	allocateInfo.commandPool = s_CommandGraphicsPool;
-	allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocateInfo.commandBufferCount = count;
-
-	auto result = vkAllocateCommandBuffers(VulkanGraphicsResourceDevice::GetLogicalDevice(), &allocateInfo, s_PrimaryBufferArray.data());
-
-	if (result)
-	{
-		printf_console("[VulkanGraphics] failed to create the primary command buffer with error code %d\n", result);
-
-		throw;
-	}
-}
-
-void OldVulkanGraphicsResourceCommandBufferManager::FreePrimaryBufferArray()
-{
-	vkFreeCommandBuffers(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_CommandGraphicsPool, s_PrimaryBufferArray.size(), s_PrimaryBufferArray.data());
-}
-
-const VkCommandBuffer& OldVulkanGraphicsResourceCommandBufferManager::GetPrimaryCommandBuffer(int index)
-{
-	return s_PrimaryBufferArray[index];
-}
-
-const VkCommandBuffer& OldVulkanGraphicsResourceCommandBufferManager::AllocateAdditionalCommandBuffer()
-{
-	size_t offset = s_AdditionalBufferArray.size();
-	s_AdditionalBufferArray.emplace_back();
-
-	auto allocateInfo = VkCommandBufferAllocateInfo();
-	allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocateInfo.pNext = NULL;
-	allocateInfo.commandPool = s_CommandGraphicsPool;
-	allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocateInfo.commandBufferCount = 1;
-
-	auto result = vkAllocateCommandBuffers(VulkanGraphicsResourceDevice::GetLogicalDevice(), &allocateInfo, s_AdditionalBufferArray.data() + offset);
-
-	if (result)
-	{
-		printf_console("[VulkanGraphics] failed to create the primary command buffer with error code %d\n", result);
-
-		throw;
-	}
-
-	return s_AdditionalBufferArray[offset];
-}
-
-void OldVulkanGraphicsResourceCommandBufferManager::FreeAdditionalCommandBuffer(const VkCommandBuffer& commandBuffer)
-{
-	auto iter = s_AdditionalBufferArray.begin();
-	auto end = s_AdditionalBufferArray.end();
-
-	while (iter != end)
-	{
-		if ((*iter) == commandBuffer)
-		{
-			break;
-		}
-
-		++iter;
-	}
-
-	if (iter == end)
-	{
-		return;
-	}
-
-	//vkFreeCommandBuffers(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_CommandGraphicsPool, 1, &commandBuffer);
-	s_AdditionalBufferArray.erase(iter);
-}
-
-const std::vector<VkCommandBuffer>& OldVulkanGraphicsResourceCommandBufferManager::GetAllAdditionalCommandBuffers()
-{
-	return s_AdditionalBufferArray;
-}
-
-void OldVulkanGraphicsResourceCommandBufferManager::ClearAdditionalCommandBuffers()
-{
-	//vkFreeCommandBuffers(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_CommandGraphicsPool, s_AdditionalBufferArray.size(), s_AdditionalBufferArray.data());
-	s_AdditionalBufferArray.clear();
-}
-
-bool OldVulkanGraphicsResourceCommandBufferManager::CreateInternal()
-{
-	auto createInfo = VkCommandPoolCreateInfo();
-	createInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	createInfo.pNext = NULL;
-	createInfo.flags = 0;
-	createInfo.queueFamilyIndex = VulkanGraphicsResourceDevice::GetGraphicsQueueFamilyIndex();
-
-	auto result = vkCreateCommandPool(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &s_CommandGraphicsPool);
-
-	if (result)
-	{
-		printf_console("[VulkanGraphics] failed to create a command pool with error code %d\n", result);
-
-		throw;
-	}
-
-	return true;
-}
-
-bool OldVulkanGraphicsResourceCommandBufferManager::DestroyInternal()
-{
-	ClearAdditionalCommandBuffers();
-	FreePrimaryBufferArray();
-	vkDestroyCommandPool(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_CommandGraphicsPool, NULL);
-
-	return true;
 }

@@ -70,7 +70,6 @@ VulkanGraphics::~VulkanGraphics()
 
 	m_ResourcePipelineMgr.Destroy();
 	m_ResourceRenderPassMgr.Destroy();
-	m_ResourceCommandBufferMgr.Destroy();
 	m_ResourceSwapchain.Destroy();
 	m_ResourceDevice.Destroy();
 	m_ResourceSurface.Destroy();
@@ -84,7 +83,6 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 	m_ResourceSurface.Create();
 	m_ResourceDevice.Create();
 	m_ResourceSwapchain.Create();
-	m_ResourceCommandBufferMgr.Create();
 	m_ResourceRenderPassMgr.Create();
 	m_ResourcePipelineMgr.Create();
 
@@ -100,7 +98,6 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 	m_AcquireNextImageSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
 	m_QueueSubmitFenceIndex = m_ResourcePipelineMgr.CreateGfxFence();
 	m_QueueSubmitPrimarySemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
-	m_QueueSubmitAdditionalSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
 
 	char buffer[1024];
 	GetCurrentDirectory(1024, buffer);
@@ -147,10 +144,8 @@ void VulkanGraphics::Invalidate()
 
 	m_ResourcePipelineMgr.Destroy();
 	m_ResourceRenderPassMgr.Destroy();
-	m_ResourceCommandBufferMgr.Destroy();
 	m_ResourceSwapchain.Destroy();
 	m_ResourceSwapchain.Create();
-	m_ResourceCommandBufferMgr.Create();
 	m_ResourceRenderPassMgr.Create();
 	m_ResourcePipelineMgr.Create();
 
@@ -166,14 +161,8 @@ void VulkanGraphics::Invalidate()
 	m_AcquireNextImageSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
 	m_QueueSubmitFenceIndex = m_ResourcePipelineMgr.CreateGfxFence();
 	m_QueueSubmitPrimarySemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
-	m_QueueSubmitAdditionalSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
 
 	BuildRenderLoop();
-}
-
-void VulkanGraphics::InitializeFrame()
-{
-	m_ResourceCommandBufferMgr.ClearAdditionalCommandBuffers();
 }
 
 void VulkanGraphics::SubmitPrimary()
@@ -181,28 +170,29 @@ void VulkanGraphics::SubmitPrimary()
 	auto acquireNextImageSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_AcquireNextImageSemaphoreIndex);
 	VulkanGraphicsResourceSwapchain::AcquireNextImage(acquireNextImageSemaphore, VK_NULL_HANDLE);
 
+	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::ClearAllTemporaryResources>(NULL);
 	TransferAllStagingBuffers();
+	DrawGUI(acquireNextImageSemaphore);
 	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::SubmitAllCommandBuffers>([&](auto* commandPtr) {
-		commandPtr->m_WaitSemaphoreArray.push_back(acquireNextImageSemaphore);
+		if (acquireNextImageSemaphore != VK_NULL_HANDLE)
+		{
+			commandPtr->m_WaitSemaphoreArray.push_back(acquireNextImageSemaphore);
+		}		
 		});
-
-	// Execute body commands
 	VulnerableLayer::ExecuteAllCommands();
-
-
-	// TODO: after chaging GUI logic to use new command buffer manager, the below function will be repositioned to be right after the Transfer function
-	DrawGUI();
 }
 
 void VulkanGraphics::PresentFrame()
 {
-	//auto queueSubmitPrimarySemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_QueueSubmitPrimarySemaphoreIndex);
-	auto queueSubmitAdditionalSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_QueueSubmitAdditionalSemaphoreIndex);
 	auto imageIndex = VulkanGraphicsResourceSwapchain::GetAcquiredImageIndex();
 	std::vector<VkSemaphore> waitSemaphoreArray;
 	{
-		//waitSemaphoreArray.push_back(queueSubmitPrimarySemaphore);
-		waitSemaphoreArray.push_back(queueSubmitAdditionalSemaphore);
+		auto semaphore = VulkanGraphicsResourceCommandBufferManager::GetInstance().GetSemaphoreForSubmission();
+
+		if (semaphore != VK_NULL_HANDLE)
+		{
+			waitSemaphoreArray.push_back(semaphore);
+		}		
 	}
 
 	auto presentInfo = VkPresentInfoKHR();
@@ -531,11 +521,7 @@ void VulkanGraphics::TransferAllStagingBuffers()
 		return;
 	}
 
-	// ***** TODO: still need to figure out how properly we can handle transfering resources *****
-	// 1) transfer queue isn't necessary to be seperate, so just making graphic_transfer and compute_transfer will be fine...
-	// 2) removing transient command buffers should be repositioned after sumbiting queues...
 	size_t commandBufferIdentifier = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().AllocateIdentifier();
-
 	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateCommandBuffer>([&](auto* commandPtr) {
 		commandPtr->m_Identifier = commandBufferIdentifier;
 		commandPtr->m_InputData.m_CommandType = EVulkanCommandType::GRAPHICS; // graphics and compute queue both have transfer functionality, so it isn't necessary to use the specific transfer queue...
@@ -784,36 +770,30 @@ void VulkanGraphics::DeinitializeGUI()
 	gImGuiRenderPassIndex = -1;
 }
 
-void VulkanGraphics::DrawGUI()
+void VulkanGraphics::DrawGUI(VkSemaphore& acquireNextImageSemaphore)
 {
 	// Upload Fonts
 	if (!gImGuiFontUpdated)
 	{
 		gImGuiFontUpdated = true;
 
-		// Use any command queue
-		auto command_buffer = OldVulkanGraphicsResourceCommandBufferManager::AllocateAdditionalCommandBuffer();
-		VkCommandBufferBeginInfo begin_info = {};
-		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		begin_info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		size_t commandBufferIdentifier = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().AllocateIdentifier();
+		VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateCommandBuffer>([&](auto* commandPtr) {
+			commandPtr->m_Identifier = commandBufferIdentifier;
+			commandPtr->m_InputData.m_CommandType = EVulkanCommandType::GRAPHICS;
+			commandPtr->m_InputData.m_IsTransient = true;
+			commandPtr->m_InputData.m_SortOrder = 10;
+			});
 
-		auto err = vkBeginCommandBuffer(command_buffer, &begin_info);
-		check_vk_result(err);
-		ImGui_ImplVulkan_CreateFontsTexture(command_buffer);
+		auto* recordingCommandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
+		recordingCommandPtr->m_Identifier = commandBufferIdentifier;
 
-		VkSubmitInfo end_info = {};
-		end_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		end_info.commandBufferCount = 1;
-		end_info.pCommandBuffers = &command_buffer;
-		err = vkEndCommandBuffer(command_buffer);
-		check_vk_result(err);
-		err = vkQueueSubmit(VulkanGraphicsResourceDevice::GetGraphicsQueue(), 1, &end_info, VK_NULL_HANDLE);
-		check_vk_result(err);
-
-		err = vkDeviceWaitIdle(VulkanGraphicsResourceDevice::GetLogicalDevice());
-		check_vk_result(err);
-		ImGui_ImplVulkan_DestroyFontUploadObjects();
-		OldVulkanGraphicsResourceCommandBufferManager::ClearAdditionalCommandBuffers();
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::GUICreateFontTexturesExecution>(recordingCommandPtr->m_ExecutionPtrArray, NULL);
+		VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::SubmitAllCommandBuffers>([&](auto* commandPtr) {
+			commandPtr->m_WaitSemaphoreArray.push_back(acquireNextImageSemaphore);
+			acquireNextImageSemaphore = VK_NULL_HANDLE;
+			});
+		VulnerableLayer::ExecuteAllCommands();
 	}
 
 	// Start the Dear ImGui frame
@@ -829,71 +809,31 @@ void VulkanGraphics::DrawGUI()
 
 	if (!is_minimized)
 	{
-		auto command_buffer = OldVulkanGraphicsResourceCommandBufferManager::AllocateAdditionalCommandBuffer();
-		VkCommandBufferBeginInfo begin_info = {};
-		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		begin_info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		size_t commandBufferIdentifier = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().AllocateIdentifier();
+		VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateCommandBuffer>([&](auto* commandPtr) {
+			commandPtr->m_Identifier = commandBufferIdentifier;
+			commandPtr->m_InputData.m_CommandType = EVulkanCommandType::GRAPHICS;
+			commandPtr->m_InputData.m_IsTransient = true;
+			commandPtr->m_InputData.m_SortOrder = 10;
+			});
 
-		auto err = vkBeginCommandBuffer(command_buffer, &begin_info);
-		check_vk_result(err);
-		BeginRenderPass(command_buffer, gImGuiRenderPassIndex);
+		auto* recordingCommandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
+		recordingCommandPtr->m_Identifier = commandBufferIdentifier;
 
-		// Record dear imgui primitives into command buffer
-		ImGui_ImplVulkan_RenderDrawData(draw_data, command_buffer);
-
-		EndRenderPass(command_buffer);
-		err = vkEndCommandBuffer(command_buffer);
-		check_vk_result(err);
-	}
-
-
-	// Submit Additional...
-	auto queueSubmitAdditionalSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_QueueSubmitAdditionalSemaphoreIndex);
-	auto imageIndex = VulkanGraphicsResourceSwapchain::GetAcquiredImageIndex();
-
-	std::vector<VkSemaphore> waitSemaphoreArray;
-	{
-		waitSemaphoreArray.push_back(VulkanGraphicsResourceCommandBufferManager::GetInstance().GetSemaphoreForSubmission());
-	}
-
-	std::vector<VkPipelineStageFlags> waitDstStageMaskArray;
-	{
-		waitDstStageMaskArray.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-	}
-
-	std::vector<VkCommandBuffer> commandBufferArray;
-	{
-		auto additionalCommandBuffers = m_ResourceCommandBufferMgr.GetAllAdditionalCommandBuffers();
-
-		for (auto commandBuffer : additionalCommandBuffers)
-		{
-			commandBufferArray.push_back(commandBuffer);
-		}
-	}
-
-	std::vector<VkSemaphore> signalSemaphoreArray;
-	{
-		signalSemaphoreArray.push_back(queueSubmitAdditionalSemaphore);
-	}
-
-	auto submitInfo = VkSubmitInfo();
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.pNext = NULL;
-	submitInfo.waitSemaphoreCount = waitSemaphoreArray.size();
-	submitInfo.pWaitSemaphores = waitSemaphoreArray.data();
-	submitInfo.pWaitDstStageMask = waitDstStageMaskArray.data();
-	submitInfo.commandBufferCount = commandBufferArray.size(); // TODO: in the future think about submitting multiple queues simultaneously...
-	submitInfo.pCommandBuffers = commandBufferArray.data();
-	submitInfo.signalSemaphoreCount = signalSemaphoreArray.size();
-	submitInfo.pSignalSemaphores = signalSemaphoreArray.data();
-
-	auto result = vkQueueSubmit(m_ResourceDevice.GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-
-	if (result)
-	{
-		printf_console("[VulkanGraphics] failed to submit a queue with error code %d\n", result);
-
-		throw;
+		uint32_t width, height, imageIndex;
+		m_ResourceSwapchain.GetSwapchainSize(width, height);
+		imageIndex = VulkanGraphicsResourceSwapchain::GetAcquiredImageIndex();
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::BeginRenderPassExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
+			gfxExecutionPtr->m_RenderPassIndex = gImGuiRenderPassIndex;
+			gfxExecutionPtr->m_FramebufferIndex = m_BackBufferIndexArray[imageIndex];
+			gfxExecutionPtr->m_FrameBufferColor = m_ResourceSwapchain.GetImage(imageIndex);
+			gfxExecutionPtr->m_FrameBufferDepth = m_DepthBuffer.GetImage();
+			gfxExecutionPtr->m_RenderArea = { {0, 0}, {width, height} };
+			});
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::GUIRenderDrawDataExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
+			gfxExecutionPtr->m_DrawDataPtr = draw_data;
+			});
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::EndRenderPassExecution>(recordingCommandPtr->m_ExecutionPtrArray, NULL);
 	}
 }
 

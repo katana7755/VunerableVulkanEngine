@@ -49,6 +49,12 @@ namespace VulnerableCommand
 	{
 	};
 
+	struct ClearAllTemporaryResources : public HeaderCommand
+	{
+	private:
+		void Execute() override;
+	};
+
 	struct CreateShader : public HeaderCommand
 	{
 		size_t m_Identifier;

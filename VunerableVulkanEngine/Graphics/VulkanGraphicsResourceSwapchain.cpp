@@ -17,6 +17,22 @@ const VkSwapchainKHR& VulkanGraphicsResourceSwapchain::GetSwapchain()
 	return s_Swapchain;
 }
 
+int VulkanGraphicsResourceSwapchain::GetImageCount()
+{
+	return s_ImageArray.size();
+}
+
+const VkImage& VulkanGraphicsResourceSwapchain::GetImage(int index)
+{
+	if (index < 0 || index >= s_ImageArray.size())
+	{
+		printf_console("[VulkanGraphics] failed to get image pointer (%d / %d)\n", index, s_ImageArray.size());
+		throw;
+	}
+
+	return s_ImageArray[index];
+}
+
 int VulkanGraphicsResourceSwapchain::GetImageViewCount()
 {
 	return s_ImageViewArray.size();

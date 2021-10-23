@@ -6,6 +6,8 @@ class VulkanGraphicsResourceSwapchain : public VulkanGraphicsResourceBase
 {
 public:
 	static const VkSwapchainKHR& GetSwapchain();
+	static int GetImageCount();
+	static const VkImage& GetImage(int index);
 	static int GetImageViewCount();
 	static const VkImageView& GetImageView(int index);
 	static void AcquireNextImage(const VkSemaphore& waitSemaphore, const VkFence& waitFence);

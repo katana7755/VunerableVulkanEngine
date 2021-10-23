@@ -1071,6 +1071,15 @@ bool    ImGui_ImplVulkan_LoadFunctions(PFN_vkVoidFunction(*loader_func)(const ch
     return true;
 }
 
+// ********** Vulnerable Engine **********
+void ImGui_ImplVulkan_CollectResourceUsageInfoForFonts(VulkanGfxObjectUsage& gfxObjectUsage)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    ImGui_ImplVulkan_Data* bd = ImGui_ImplVulkan_GetBackendData();
+    gfxObjectUsage.m_WriteBufferArray.push_back(bd->UploadBuffer);
+    gfxObjectUsage.m_WriteTextureArray.push_back(bd->FontImage);
+}
+
 bool    ImGui_ImplVulkan_Init(ImGui_ImplVulkan_InitInfo* info, VkRenderPass render_pass)
 {
     IM_ASSERT(g_FunctionsLoaded && "Need to call ImGui_ImplVulkan_LoadFunctions() if IMGUI_IMPL_VULKAN_NO_PROTOTYPES or VK_NO_PROTOTYPES are set!");

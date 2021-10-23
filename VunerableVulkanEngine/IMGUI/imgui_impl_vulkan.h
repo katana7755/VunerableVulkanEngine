@@ -24,6 +24,9 @@
 #pragma once
 #include "imgui.h"      // IMGUI_IMPL_API
 
+// ********** Vulnerable Engine **********
+#include "../Graphics/VulkanGraphicsResourceCommandBufferManager.h"
+
 // [Configuration] in order to use a custom Vulkan function loader:
 // (1) You'll need to disable default Vulkan function prototypes.
 //     We provide a '#define IMGUI_IMPL_VULKAN_NO_PROTOTYPES' convenience configuration flag.
@@ -76,6 +79,9 @@ IMGUI_IMPL_API void     ImGui_ImplVulkan_SetMinImageCount(uint32_t min_image_cou
 // Optional: load Vulkan functions with a custom function loader
 // This is only useful with IMGUI_IMPL_VULKAN_NO_PROTOTYPES / VK_NO_PROTOTYPES
 IMGUI_IMPL_API bool     ImGui_ImplVulkan_LoadFunctions(PFN_vkVoidFunction(*loader_func)(const char* function_name, void* user_data), void* user_data = NULL);
+
+// ********** Vulnerable Engine **********
+IMGUI_IMPL_API void ImGui_ImplVulkan_CollectResourceUsageInfoForFonts(VulkanGfxObjectUsage& gfxObjectUsage);
 
 //-------------------------------------------------------------------------
 // Internal / Miscellaneous Vulkan Helpers

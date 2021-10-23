@@ -57,7 +57,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
         if (gGraphicsPtr != NULL)
         {
-            gGraphicsPtr->InitializeFrame();
             gGraphicsPtr->SubmitPrimary();
             gGraphicsPtr->PresentFrame();
         }

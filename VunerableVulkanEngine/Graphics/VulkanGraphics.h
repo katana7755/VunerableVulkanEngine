@@ -24,7 +24,6 @@ public:
 #endif
 
 	void Invalidate();
-	void InitializeFrame();
 	void SubmitPrimary();
 	void PresentFrame();
 	void BeginRenderPass(const VkCommandBuffer& commandBuffer, int renderPassIndex);
@@ -39,14 +38,13 @@ private:
 #endif
 
 	void DeinitializeGUI();
-	void DrawGUI();
+	void DrawGUI(VkSemaphore& acquireNextImageSemaphore);
 
 private:
 	VulkanGraphicsResourceInstance m_ResourceInstance;
 	VulkanGraphicsResourceSurface m_ResourceSurface;
 	VulkanGraphicsResourceDevice m_ResourceDevice;
 	VulkanGraphicsResourceSwapchain m_ResourceSwapchain;
-	OldVulkanGraphicsResourceCommandBufferManager m_ResourceCommandBufferMgr;
 	VulkanGraphicsResourceRenderPassManager m_ResourceRenderPassMgr;
 	VulkanGraphicsResourcePipelineManager m_ResourcePipelineMgr;
 
@@ -63,7 +61,6 @@ private:
 	int m_AcquireNextImageSemaphoreIndex;
 	int m_QueueSubmitFenceIndex;
 	int m_QueueSubmitPrimarySemaphoreIndex;
-	int m_QueueSubmitAdditionalSemaphoreIndex;
 	std::vector<int> m_BackBufferIndexArray;
 	std::vector<int> m_FrontBufferIndexArray;
 
