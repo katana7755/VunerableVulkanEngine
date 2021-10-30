@@ -2,21 +2,19 @@
 #include "VulkanGraphicsResourceBase.h"
 #include <vector>
 
-class VulkanGraphicsResourceRenderPassManager : public VulkanGraphicsResourceBase
+struct VulkanRenderPassInputData
+{
+	std::vector<VkAttachmentDescription>	m_AttachmentDescriptionArray;
+	std::vector<VkSubpassDescription>		m_SubpassDescriptionArray;
+	std::vector<VkSubpassDependency>		m_SubpassDependencyArray;
+};
+
+class VulkanGraphicsResourceRenderPassManager : public VulkanGraphicsResourceManagerBase<VkRenderPass, VulkanRenderPassInputData, size_t>
 {
 public:
-	static int CreateRenderPass(const std::vector<VkAttachmentDescription>& attachmentDescArray, const std::vector<VkSubpassDescription>& subpassDescArray, const std::vector<VkSubpassDependency>& subpassDepArray);
-	static const VkRenderPass& GetRenderPass(int index);
-	static void DestroyRenderPass(int index);
-	static int CreateFramebuffer(int renderPassIndex, std::vector<VkImageView> attachmentArray, uint32_t width, uint32_t height, uint32_t layers);
-	static const VkFramebuffer& GetFramebuffer(int index);
-	static void DestroyFramebuffer(int index);
-
-private:
-	static std::vector<VkRenderPass> s_RenderPassArray;
-	static std::vector<VkFramebuffer> s_FramebufferArray;
+	static VulkanGraphicsResourceRenderPassManager& GetInstance();
 
 protected:
-	virtual bool CreateInternal() override;
-	virtual bool DestroyInternal() override;
+	VkRenderPass CreateResourcePhysically(const VulkanRenderPassInputData& inputData) override;
+	void DestroyResourcePhysicially(const VkRenderPass& renderPass) override;
 };

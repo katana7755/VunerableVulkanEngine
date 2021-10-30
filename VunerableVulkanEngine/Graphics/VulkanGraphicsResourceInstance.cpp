@@ -10,11 +10,12 @@
 const char* APPLICATION_NAME = "VunerableVulkanEngine";
 const char* ENGINE_NAME = "VunerableVulkanEngine";
 
-VkInstance VulkanGraphicsResourceInstance::s_Instance;
+VulkanGraphicsResourceInstance g_Instance;
 
-#ifdef _DEBUG
-VkDebugUtilsMessengerEXT VulkanGraphicsResourceInstance::s_DebugCallbackMessenger;
-#endif
+VulkanGraphicsResourceInstance& VulkanGraphicsResourceInstance::GetInstance()
+{
+	return g_Instance;
+}
 
 bool VulkanGraphicsResourceInstance::CreateInternal()
 {
@@ -78,7 +79,7 @@ bool VulkanGraphicsResourceInstance::CreateInternal()
 	createInfo.enabledLayerCount = layerNameArray.size();
 	createInfo.ppEnabledLayerNames = layerNameArray.data();
 
-	auto result = vkCreateInstance(&createInfo, NULL, &s_Instance);
+	auto result = vkCreateInstance(&createInfo, NULL, &m_VkInstance);
 
 	if (result)
 	{
@@ -105,7 +106,7 @@ bool VulkanGraphicsResourceInstance::DestroyInternal()
 	DestroyDebugUtilsMessenger();
 #endif
 
-	vkDestroyInstance(s_Instance, NULL);
+	vkDestroyInstance(m_VkInstance, NULL);
 
 	return true;
 }
@@ -127,19 +128,19 @@ VkResult VulkanGraphicsResourceInstance::CreateDebugUtilsMessenger()
 	createInfo.pfnUserCallback = PrintDebugMessage;
 	createInfo.pUserData = NULL;
 
-	auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(s_Instance, "vkCreateDebugUtilsMessengerEXT");
+	auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(m_VkInstance, "vkCreateDebugUtilsMessengerEXT");
 
 	if (func == NULL)
 	{
 		return VkResult::VK_ERROR_EXTENSION_NOT_PRESENT;
 	}
 
-	return func(s_Instance, &createInfo, NULL, &s_DebugCallbackMessenger);
+	return func(m_VkInstance, &createInfo, NULL, &m_DebugCallbackMessenger);
 }
 
 void VulkanGraphicsResourceInstance::DestroyDebugUtilsMessenger()
 {
-	auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(s_Instance, "vkDestroyDebugUtilsMessengerEXT");
+	auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(m_VkInstance, "vkDestroyDebugUtilsMessengerEXT");
 
 	if (func == NULL)
 	{
@@ -147,6 +148,6 @@ void VulkanGraphicsResourceInstance::DestroyDebugUtilsMessenger()
 		return;
 	}
 
-	func(s_Instance, s_DebugCallbackMessenger, NULL);
+	func(m_VkInstance, m_DebugCallbackMessenger, NULL);
 }
 #endif

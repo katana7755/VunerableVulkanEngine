@@ -3,6 +3,7 @@
 #include "VulkanGraphicsResourceDevice.h"
 #include "VulkanGraphicsResourceSwapchain.h"
 #include "VulkanGraphicsResourceRenderPassManager.h"
+#include "VulkanGraphicsResourceFrameBufferManager.h"
 #include "VulkanGraphicsResourceGraphicsPipelineManager.h"
 #include "VulkanGraphicsResourcePipelineLayoutManager.h"
 #include <algorithm>
@@ -15,10 +16,10 @@ const VkQueue& EVulkanCommandType::ToQueue(EVulkanCommandType::TYPE commandType)
 	switch (commandType)
 	{
 	case EVulkanCommandType::GRAPHICS:
-		return VulkanGraphicsResourceDevice::GetGraphicsQueue();
+		return VulkanGraphicsResourceDevice::GetInstance().GetGraphicsQueue();
 
 	case EVulkanCommandType::COMPUTE:
-		return VulkanGraphicsResourceDevice::GetComputeQueue();
+		return VulkanGraphicsResourceDevice::GetInstance().GetComputeQueue();
 
 	default:
 		printf_console("[VulkanGraphics] failed to convert the command type(%d) into the actual queue\n", commandType);
@@ -35,6 +36,7 @@ void VulkanQueueSubmitNode::Initialize()
 void VulkanQueueSubmitNode::Deinitialize()
 {
 	VulkanGraphicsResourceSemaphoreManager::GetInstance().DestroyResource(m_SignalSemaphoreIdentifier);
+	VulkanGraphicsResourceSemaphoreManager::GetInstance().ReleaseIdentifier(m_SignalSemaphoreIdentifier);
 	m_SignalSemaphoreIdentifier = (size_t)-1;
 }
 
@@ -104,8 +106,8 @@ namespace VulkanGfxExecution
 		auto beginInfo = VkRenderPassBeginInfo();
 		beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		beginInfo.pNext = NULL;
-		beginInfo.renderPass = VulkanGraphicsResourceRenderPassManager::GetRenderPass(m_RenderPassIndex);
-		beginInfo.framebuffer = VulkanGraphicsResourceRenderPassManager::GetFramebuffer(m_FramebufferIndex);
+		beginInfo.renderPass = VulkanGraphicsResourceRenderPassManager::GetInstance().GetResource(m_RenderPassIdentifier);
+		beginInfo.framebuffer = VulkanGraphicsResourceFrameBufferManager::GetInstance().GetResource(m_FrameBufferIdentifier);
 		beginInfo.renderArea = m_RenderArea;
 
 		auto clearValueArray = std::vector<VkClearValue>();
@@ -426,7 +428,7 @@ void VulkanGraphicsResourceCommandBufferManager::DestroyResourcePhysicially(cons
 	}
 
 	auto commandPool = outputData.m_IsTransient ? m_TransientCommandPoolMap[outputData.m_CommandType] : m_StaticCommandPoolMap[outputData.m_CommandType];
-	vkFreeCommandBuffers(VulkanGraphicsResourceDevice::GetLogicalDevice(), commandPool, 1, &outputData.m_RecordedCommandBuffer);
+	vkFreeCommandBuffers(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), commandPool, 1, &outputData.m_RecordedCommandBuffer);
 }
 
 void VulkanGraphicsResourceCommandBufferManager::FreeAllStaticCommandBuffers()
@@ -463,7 +465,7 @@ void VulkanGraphicsResourceCommandBufferManager::FreeAllStaticCommandBuffers()
 			continue;
 		}
 
-		vkFreeCommandBuffers(VulkanGraphicsResourceDevice::GetLogicalDevice(), commandPool, commandBufferArray.size(), commandBufferArray.data());
+		vkFreeCommandBuffers(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), commandPool, commandBufferArray.size(), commandBufferArray.data());
 		commandBufferArray.clear();
 	}
 }
@@ -655,11 +657,11 @@ void VulkanGraphicsResourceCommandBufferManager::CreateSingleCommandPool(EVulkan
 	switch (commandType)
 	{
 		case EVulkanCommandType::GRAPHICS:
-			createInfo.queueFamilyIndex = VulkanGraphicsResourceDevice::GetGraphicsQueueFamilyIndex();
+			createInfo.queueFamilyIndex = VulkanGraphicsResourceDevice::GetInstance().GetGraphicsQueueFamilyIndex();
 			break;
 
 		case EVulkanCommandType::COMPUTE:
-			createInfo.queueFamilyIndex = VulkanGraphicsResourceDevice::GetComputeQueueFamilyIndex();
+			createInfo.queueFamilyIndex = VulkanGraphicsResourceDevice::GetInstance().GetComputeQueueFamilyIndex();
 			break;
 
 		default:
@@ -667,7 +669,7 @@ void VulkanGraphicsResourceCommandBufferManager::CreateSingleCommandPool(EVulkan
 	}
 
 	auto newCommandPool = VkCommandPool();
-	auto result = vkCreateCommandPool(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &newCommandPool);
+	auto result = vkCreateCommandPool(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &createInfo, NULL, &newCommandPool);
 
 	if (result)
 	{
@@ -690,11 +692,11 @@ void VulkanGraphicsResourceCommandBufferManager::DestroySingleCommandPool(EVulka
 {
 	if (isTransient)
 	{
-		vkDestroyCommandPool(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_TransientCommandPoolMap[commandType], NULL);
+		vkDestroyCommandPool(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_TransientCommandPoolMap[commandType], NULL);
 	}
 	else
 	{
-		vkDestroyCommandPool(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_StaticCommandPoolMap[commandType], NULL);
+		vkDestroyCommandPool(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_StaticCommandPoolMap[commandType], NULL);
 	}
 }
 
@@ -724,7 +726,7 @@ void VulkanGraphicsResourceCommandBufferManager::AllocateAndRecordCommandBuffer(
 		allocateInfo.commandPool = m_ResourceArray[indexArray[0]].m_IsTransient ? m_TransientCommandPoolMap[(EVulkanCommandType::TYPE)iType] : m_StaticCommandPoolMap[(EVulkanCommandType::TYPE)iType];
 		allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 		allocateInfo.commandBufferCount = count;
-		vkAllocateCommandBuffers(VulkanGraphicsResourceDevice::GetLogicalDevice(), &allocateInfo, commandBufferArray.data());
+		vkAllocateCommandBuffers(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &allocateInfo, commandBufferArray.data());
 
 		auto flags = m_ResourceArray[indexArray[0]].m_IsTransient ? VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT : VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 

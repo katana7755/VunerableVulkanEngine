@@ -5,38 +5,63 @@
 class VulkanGraphicsResourceSwapchain : public VulkanGraphicsResourceBase
 {
 public:
-	static const VkSwapchainKHR& GetSwapchain();
-	static int GetImageCount();
-	static const VkImage& GetImage(int index);
-	static int GetImageViewCount();
-	static const VkImageView& GetImageView(int index);
-	static void AcquireNextImage(const VkSemaphore& waitSemaphore, const VkFence& waitFence);
+	static VulkanGraphicsResourceSwapchain& GetInstance();
 
-	static const uint32_t& GetAcquiredImageIndex()
+public:
+	const VkSwapchainKHR& GetSwapchain()
 	{
-		return s_AcquiredImageIndex;
+		return m_Swapchain;
 	}
 
-	static const VkFormat& GetSwapchainFormat()
+	void AcquireNextImage(const VkSemaphore& waitSemaphore, const VkFence& waitFence);
+
+	int GetImageCount()
 	{
-		return s_SwapchainFormat;
+		return m_ImageArray.size();
+	}
+	
+	const VkImage& GetImage(int index)
+	{
+		if (index < 0 || index >= m_ImageArray.size())
+		{
+			printf_console("[VulkanGraphics] failed to get image pointer (%d / %d)\n", index, m_ImageArray.size());
+			throw;
+		}
+
+		return m_ImageArray[index];
 	}
 
-	static void GetSwapchainSize(uint32_t& outWidth, uint32_t& outHeight)
+	int GetImageViewCount()
 	{
-		outWidth = s_SwapchainWith;
-		outHeight = s_SwapchainHeight;
+		return m_ImageViewArray.size();
 	}
 
-private:
-	static VkSwapchainKHR s_Swapchain;
-	static bool s_IsImageViewArrayCreated;
-	static std::vector<VkImage> s_ImageArray;
-	static std::vector<VkImageView> s_ImageViewArray;
-	static uint32_t s_AcquiredImageIndex;
-	static VkFormat s_SwapchainFormat;
-	static uint32_t s_SwapchainWith;
-	static uint32_t s_SwapchainHeight;
+	const VkImageView& GetImageView(int index)
+	{
+		if (index < 0 || index >= m_ImageViewArray.size())
+		{
+			printf_console("[VulkanGraphics] failed to get image view pointer (%d / %d)\n", index, m_ImageArray.size());
+			throw;
+		}
+
+		return m_ImageViewArray[index];
+	}
+
+	const uint32_t& GetAcquiredImageIndex()
+	{
+		return m_AcquiredImageIndex;
+	}
+
+	const VkFormat& GetSwapchainFormat()
+	{
+		return m_SwapchainFormat;
+	}
+
+	void GetSwapchainSize(uint32_t& outWidth, uint32_t& outHeight)
+	{
+		outWidth = m_SwapchainWith;
+		outHeight = m_SwapchainHeight;
+	}
 
 protected:
 	virtual bool CreateInternal() override;
@@ -47,5 +72,15 @@ private:
 	bool DestroySwapchain();
 	bool CreateImageViews();
 	bool DestroyImageViews();
+
+private:
+	VkSwapchainKHR m_Swapchain;
+	bool m_IsImageViewArrayCreated;
+	std::vector<VkImage> m_ImageArray;
+	std::vector<VkImageView> m_ImageViewArray;
+	uint32_t m_AcquiredImageIndex;
+	VkFormat m_SwapchainFormat;
+	uint32_t m_SwapchainWith;
+	uint32_t m_SwapchainHeight;
 };
 

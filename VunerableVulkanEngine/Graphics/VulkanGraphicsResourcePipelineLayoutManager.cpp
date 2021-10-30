@@ -20,7 +20,7 @@ VkPipelineLayout VulkanGraphicsResourcePipelineLayoutManager::CreateResourcePhys
     createInfo.pPushConstantRanges = inputData.m_PushConstantRangeArray.data();;
 
     auto newLayout = VkPipelineLayout();
-	auto result = vkCreatePipelineLayout(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &newLayout);
+	auto result = vkCreatePipelineLayout(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &createInfo, NULL, &newLayout);
 
     if (result)
     {
@@ -34,5 +34,5 @@ VkPipelineLayout VulkanGraphicsResourcePipelineLayoutManager::CreateResourcePhys
 
 void VulkanGraphicsResourcePipelineLayoutManager::DestroyResourcePhysicially(const VkPipelineLayout& pipelineLayout)
 {
-	vkDestroyPipelineLayout(VulkanGraphicsResourceDevice::GetLogicalDevice(), pipelineLayout, NULL);
+	vkDestroyPipelineLayout(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), pipelineLayout, NULL);
 }

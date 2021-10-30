@@ -13,23 +13,21 @@
 #include "../Editor/EditorGameView.h"
 #include "../Editor/EditorManager.h"
 
+#include "VulkanGraphicsResourceInstance.h"
+#include "VulkanGraphicsResourceSurface.h"
+#include "VulkanGraphicsResourceDevice.h"
+#include "VulkanGraphicsResourceSwapchain.h"
+#include "VulkanGraphicsResourceRenderPassManager.h"
+#include "VulkanGraphicsResourceFrameBufferManager.h"
 #include "VulnerableUploadBufferManager.h"
 #include "VulnerableLayer.h"
 #include "VulkanGraphicsResourceShaderManager.h"
 #include "VulkanGraphicsResourcePipelineLayoutManager.h"
 #include "VulkanGraphicsResourceGraphicsPipelineManager.h"
 #include "VulkanGraphicsResourceDescriptorSetLayoutManager.h"
+#include "VulkanGraphicsResourcePipelineCache.h"
 
 const int MAX_COMMAND_BUFFER_COUNT = 1;
-
-size_t g_VertexShaderIdentifier = -1;
-size_t g_fragmentShaderIdentifier = -1;
-size_t g_PipelineIdentifier = -1;
-size_t g_RenderingCommandBufferIdentifier = -1;
-
-int gImGuiRenderPassIndex = -1;
-int gImGuiDescriptorPoolIndex = -1;
-bool gImGuiFontUpdated = false;
 
 void check_vk_result(VkResult err)
 {
@@ -42,16 +40,48 @@ void check_vk_result(VkResult err)
 }
 
 VulkanGraphics::VulkanGraphics()
+	: m_DefaultRenderPassIdentifier(-1)
+	, m_VertexShaderIdentifier(-1)
+	, m_fragmentShaderIdentifier(-1)
+	, m_PipelineIdentifier(-1)
+	, m_RenderingCommandBufferIdentifier(-1)
+	, m_ImGuiRenderPassIdentifier(-1)
+	, m_ImGuiDescriptorPoolIndex(-1)
+	, m_ImGuiFontUpdated(false)
 {
-	m_ResourceInstance.Create();
+	VulkanGraphicsResourceInstance::GetInstance().Create();
 }
 
 VulkanGraphics::~VulkanGraphics()
 {
-	vkDeviceWaitIdle(VulkanGraphicsResourceDevice::GetLogicalDevice());
+	vkDeviceWaitIdle(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice());
 	DeinitializeGUI();
 	EditorGameView::SetTexture(NULL, NULL);
 	VulnerableLayer::Deinitialize();
+
+	for (size_t identifier : m_BackBufferIdentifierArray)
+	{
+		VulkanGraphicsResourceFrameBufferManager::GetInstance().DestroyResource(identifier);
+		VulkanGraphicsResourceFrameBufferManager::GetInstance().ReleaseIdentifier(identifier);
+	}
+
+	m_BackBufferIdentifierArray.clear();
+
+	for (size_t identifier : m_FrontBufferIdentifierArray)
+	{
+		VulkanGraphicsResourceFrameBufferManager::GetInstance().DestroyResource(identifier);
+		VulkanGraphicsResourceFrameBufferManager::GetInstance().ReleaseIdentifier(identifier);
+	}
+
+	m_FrontBufferIdentifierArray.clear();
+
+	if (m_DefaultRenderPassIdentifier != -1)
+	{
+		VulkanGraphicsResourceRenderPassManager::GetInstance().DestroyResource(m_DefaultRenderPassIdentifier);
+		VulkanGraphicsResourceRenderPassManager::GetInstance().ReleaseIdentifier(m_DefaultRenderPassIdentifier);
+		m_DefaultRenderPassIdentifier = -1;
+	}
+
 	m_MVPMatrixUniformBuffer.Destroy();
 
 	for (auto colorBuffer : m_ColorBufferArray)
@@ -69,21 +99,19 @@ VulkanGraphics::~VulkanGraphics()
 	m_CharacterMesh.Destroy();
 
 	m_ResourcePipelineMgr.Destroy();
-	m_ResourceRenderPassMgr.Destroy();
-	m_ResourceSwapchain.Destroy();
-	m_ResourceDevice.Destroy();
-	m_ResourceSurface.Destroy();
-	m_ResourceInstance.Destroy();
+	VulkanGraphicsResourceSwapchain::GetInstance().Destroy();
+	VulkanGraphicsResourceDevice::GetInstance().Destroy();
+	VulkanGraphicsResourceSurface::GetInstance().Destroy();
+	VulkanGraphicsResourceInstance::GetInstance().Destroy();
 }
 
 #ifdef _WIN32
 void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 {
-	m_ResourceSurface.Setup(hInstance, hWnd);
-	m_ResourceSurface.Create();
-	m_ResourceDevice.Create();
-	m_ResourceSwapchain.Create();
-	m_ResourceRenderPassMgr.Create();
+	VulkanGraphicsResourceSurface::GetInstance().Setup(hInstance, hWnd);
+	VulkanGraphicsResourceSurface::GetInstance().Create();
+	VulkanGraphicsResourceDevice::GetInstance().Create();
+	VulkanGraphicsResourceSwapchain::GetInstance().Create();
 	m_ResourcePipelineMgr.Create();
 
 	m_CharacterMesh.CreateFromFBX("../FBXs/free_male_1.FBX");
@@ -113,16 +141,22 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 void VulkanGraphics::Invalidate()
 {
 	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::DestroyGraphicsPipeline>([&](auto* commandPtr) {
-		commandPtr->m_Identifier = g_PipelineIdentifier;
+		commandPtr->m_Identifier = m_PipelineIdentifier;
 		});
 	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::DestroyShader>([&](auto* commandPtr) {
-		commandPtr->m_Identifier = g_VertexShaderIdentifier;
+		commandPtr->m_Identifier = m_VertexShaderIdentifier;
 		});
 	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::DestroyShader>([&](auto* commandPtr) {
-		commandPtr->m_Identifier = g_fragmentShaderIdentifier;
+		commandPtr->m_Identifier = m_fragmentShaderIdentifier;
 		});
 	VulnerableLayer::ExecuteAllCommands();
 
+	if (m_DefaultRenderPassIdentifier != -1)
+	{
+		VulkanGraphicsResourceRenderPassManager::GetInstance().DestroyResource(m_DefaultRenderPassIdentifier);
+		VulkanGraphicsResourceRenderPassManager::GetInstance().ReleaseIdentifier(m_DefaultRenderPassIdentifier);
+		m_DefaultRenderPassIdentifier = -1;
+	}
 
 	EditorGameView::SetTexture(NULL, NULL);
 
@@ -143,10 +177,8 @@ void VulkanGraphics::Invalidate()
 	m_CharacterMesh.Destroy();
 
 	m_ResourcePipelineMgr.Destroy();
-	m_ResourceRenderPassMgr.Destroy();
-	m_ResourceSwapchain.Destroy();
-	m_ResourceSwapchain.Create();
-	m_ResourceRenderPassMgr.Create();
+	VulkanGraphicsResourceSwapchain::GetInstance().Destroy();
+	VulkanGraphicsResourceSwapchain::GetInstance().Create();
 	m_ResourcePipelineMgr.Create();
 
 	m_CharacterMesh.CreateFromFBX("../FBXs/free_male_1.FBX");
@@ -168,7 +200,7 @@ void VulkanGraphics::Invalidate()
 void VulkanGraphics::SubmitPrimary()
 {
 	auto acquireNextImageSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_AcquireNextImageSemaphoreIndex);
-	VulkanGraphicsResourceSwapchain::AcquireNextImage(acquireNextImageSemaphore, VK_NULL_HANDLE);
+	VulkanGraphicsResourceSwapchain::GetInstance().AcquireNextImage(acquireNextImageSemaphore, VK_NULL_HANDLE);
 
 	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::ClearAllTemporaryResources>(NULL);
 	TransferAllStagingBuffers();
@@ -184,7 +216,7 @@ void VulkanGraphics::SubmitPrimary()
 
 void VulkanGraphics::PresentFrame()
 {
-	auto imageIndex = VulkanGraphicsResourceSwapchain::GetAcquiredImageIndex();
+	auto imageIndex = VulkanGraphicsResourceSwapchain::GetInstance().GetAcquiredImageIndex();
 	std::vector<VkSemaphore> waitSemaphoreArray;
 	{
 		auto semaphore = VulkanGraphicsResourceCommandBufferManager::GetInstance().GetSemaphoreForSubmission();
@@ -201,11 +233,11 @@ void VulkanGraphics::PresentFrame()
 	presentInfo.waitSemaphoreCount = waitSemaphoreArray.size();
 	presentInfo.pWaitSemaphores = waitSemaphoreArray.data();
 	presentInfo.swapchainCount = 1;
-	presentInfo.pSwapchains = &m_ResourceSwapchain.GetSwapchain();
+	presentInfo.pSwapchains = &VulkanGraphicsResourceSwapchain::GetInstance().GetSwapchain();
 	presentInfo.pImageIndices = &imageIndex;
 	presentInfo.pResults = NULL;
 
-	auto result = vkQueuePresentKHR(m_ResourceDevice.GetPresentQueue(), &presentInfo);
+	auto result = vkQueuePresentKHR(VulkanGraphicsResourceDevice::GetInstance().GetPresentQueue(), &presentInfo);
 
 	if (result == VK_ERROR_OUT_OF_DATE_KHR)
 	{
@@ -221,51 +253,17 @@ void VulkanGraphics::PresentFrame()
 	}
 }
 
-void VulkanGraphics::BeginRenderPass(const VkCommandBuffer& commandBuffer, int renderPassIndex)
-{
-	uint32_t width, height, imageIndex;
-	m_ResourceSwapchain.GetSwapchainSize(width, height);
-	imageIndex = VulkanGraphicsResourceSwapchain::GetAcquiredImageIndex();
-
-	std::vector<VkClearValue> clearValueArray;
-	{
-		auto clearValue = VkClearValue();
-		clearValue.color = { 0.0f, 0.0f, 1.0f, 1.0f };
-		clearValue.depthStencil.depth = 0.0f;
-		clearValue.depthStencil.stencil = 0;
-		clearValueArray.push_back(clearValue);
-	}
-	{
-		auto clearValue = VkClearValue();
-		clearValue.color = { 0.0f, 0.0f, 0.0f, 0.0f };
-		clearValue.depthStencil.depth = 1.0f;
-		clearValue.depthStencil.stencil = 0;
-		clearValueArray.push_back(clearValue);
-	}
-
-	auto renderPassBegin = VkRenderPassBeginInfo();
-	renderPassBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	renderPassBegin.pNext = NULL;
-	renderPassBegin.renderPass = m_ResourceRenderPassMgr.GetRenderPass(renderPassIndex);
-	renderPassBegin.framebuffer = m_ResourceRenderPassMgr.GetFramebuffer(m_BackBufferIndexArray[imageIndex]);
-	renderPassBegin.renderArea = { {0, 0}, {width, height} };
-	renderPassBegin.clearValueCount = clearValueArray.size();
-	renderPassBegin.pClearValues = clearValueArray.data();
-	vkCmdBeginRenderPass(commandBuffer, &renderPassBegin, VK_SUBPASS_CONTENTS_INLINE);
-}
-
-void VulkanGraphics::EndRenderPass(const VkCommandBuffer& commandBuffer)
-{
-	vkCmdEndRenderPass(commandBuffer);
-}
-
 void VulkanGraphics::BuildRenderLoop()
 {
-	std::vector<VkAttachmentDescription> attachmentDescArray;
+	m_DefaultRenderPassIdentifier = VulkanGraphicsResourceRenderPassManager::GetInstance().AllocateIdentifier();
+
+	// TODO: this should be abstracted in order to be a high level api...
+	// TODO: additionally, this is needed to be a header command in VulnerableLayer...
+	auto renderPassInputData = VulkanRenderPassInputData();
 	{
 		auto desc = VkAttachmentDescription();
 		desc.flags = 0;
-		desc.format = VulkanGraphicsResourceSwapchain::GetSwapchainFormat();
+		desc.format = VulkanGraphicsResourceSwapchain::GetInstance().GetSwapchainFormat();
 		desc.samples = VK_SAMPLE_COUNT_1_BIT; // TODO: need to be modified when starting to consider msaa...(NECESSARY!!!)
 		desc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -273,7 +271,7 @@ void VulkanGraphics::BuildRenderLoop()
 		desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		desc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		attachmentDescArray.push_back(desc);
+		renderPassInputData.m_AttachmentDescriptionArray.push_back(desc);
 	}
 	{
 		auto desc = VkAttachmentDescription();
@@ -286,11 +284,10 @@ void VulkanGraphics::BuildRenderLoop()
 		desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		desc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-		attachmentDescArray.push_back(desc);
+		renderPassInputData.m_AttachmentDescriptionArray.push_back(desc);
 	}
 
 	// TODO: think about optimizable use-cases of subpass...one can be postprocess...
-	std::vector<VkSubpassDescription> subPassDescArray;
 	std::vector<VkAttachmentReference> subPassInputAttachmentArray;
 	std::vector<VkAttachmentReference> subPassColorAttachmentArray;
 	auto subPassDepthStencilAttachment = VkAttachmentReference();
@@ -328,7 +325,7 @@ void VulkanGraphics::BuildRenderLoop()
 		desc.pDepthStencilAttachment = &subPassDepthStencilAttachment;
 		desc.preserveAttachmentCount = subPassPreserveAttachmentArray.size();
 		desc.pPreserveAttachments = subPassPreserveAttachmentArray.data();
-		subPassDescArray.push_back(desc);
+		renderPassInputData.m_SubpassDescriptionArray.push_back(desc);
 	}
 
 	// TODO: still it's not perfectly clear... let's study more on this...
@@ -342,22 +339,30 @@ void VulkanGraphics::BuildRenderLoop()
 		dep.srcAccessMask = 0;
 		dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;// VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 		dep.dependencyFlags = 0;
-		subPassDepArray.push_back(dep);
+		renderPassInputData.m_SubpassDependencyArray.push_back(dep);
 	}
 
-	int renderPassIndex = m_ResourceRenderPassMgr.CreateRenderPass(attachmentDescArray, subPassDescArray, subPassDepArray);
-	int swapchainImageViewCount = m_ResourceSwapchain.GetImageViewCount();
-	uint32_t width, height, layers;
-	m_ResourceSwapchain.GetSwapchainSize(width, height);
+	VulkanGraphicsResourceRenderPassManager::GetInstance().CreateResource(m_DefaultRenderPassIdentifier, renderPassInputData, m_DefaultRenderPassIdentifier);
 
-	m_BackBufferIndexArray.clear();
+	int swapchainImageViewCount = VulkanGraphicsResourceSwapchain::GetInstance().GetImageViewCount();
+	uint32_t width, height, layers;
+	VulkanGraphicsResourceSwapchain::GetInstance().GetSwapchainSize(width, height);
 
 	for (int i = 0; i < swapchainImageViewCount; ++i)
 	{
-		m_BackBufferIndexArray.push_back(m_ResourceRenderPassMgr.CreateFramebuffer(renderPassIndex, { m_ResourceSwapchain.GetImageView(i), m_DepthBuffer.GetImageView() }, width, height, 1));
+		auto frameBufferInputData = VulkanFrameBufferInputData();
+		frameBufferInputData.m_RenderPassIdentifier = m_DefaultRenderPassIdentifier;
+		frameBufferInputData.m_AttachmentArray.push_back(VulkanGraphicsResourceSwapchain::GetInstance().GetImageView(i));
+		frameBufferInputData.m_AttachmentArray.push_back(m_DepthBuffer.GetImageView());
+		frameBufferInputData.m_Width = width;
+		frameBufferInputData.m_Height = height;
+		frameBufferInputData.m_Layers = 1;
+
+		size_t frameBufferIdentifier = VulkanGraphicsResourceFrameBufferManager::GetInstance().AllocateIdentifier();
+		VulkanGraphicsResourceFrameBufferManager::GetInstance().CreateResource(frameBufferIdentifier, frameBufferInputData, frameBufferIdentifier);
+		m_BackBufferIdentifierArray.push_back(frameBufferIdentifier);
 	}
 
-	m_FrontBufferIndexArray.clear();
 	m_ColorBufferArray.clear();
 
 	for (int i = 0; i < 1; ++i)
@@ -365,7 +370,18 @@ void VulkanGraphics::BuildRenderLoop()
 		VulkanGraphicsObjectTexture colorBuffer;
 		colorBuffer.CreateAsColorBuffer();
 		m_ColorBufferArray.push_back(colorBuffer);
-		m_FrontBufferIndexArray.push_back(m_ResourceRenderPassMgr.CreateFramebuffer(renderPassIndex, { colorBuffer.GetImageView(), m_DepthBuffer.GetImageView() }, width, height, 1));
+
+		auto frameBufferInputData = VulkanFrameBufferInputData();
+		frameBufferInputData.m_RenderPassIdentifier = m_DefaultRenderPassIdentifier;
+		frameBufferInputData.m_AttachmentArray.push_back(colorBuffer.GetImageView());
+		frameBufferInputData.m_AttachmentArray.push_back(m_DepthBuffer.GetImageView());
+		frameBufferInputData.m_Width = width;
+		frameBufferInputData.m_Height = height;
+		frameBufferInputData.m_Layers = 1;
+
+		size_t frameBufferIdentifier = VulkanGraphicsResourceFrameBufferManager::GetInstance().AllocateIdentifier();
+		VulkanGraphicsResourceFrameBufferManager::GetInstance().CreateResource(frameBufferIdentifier, frameBufferInputData, frameBufferIdentifier);
+		m_FrontBufferIdentifierArray.push_back(frameBufferIdentifier);
 	}
 
 	{
@@ -392,7 +408,7 @@ void VulkanGraphics::BuildRenderLoop()
 		commandPtr->m_MetaData.m_VertexInputArray.push_back(EVulkanShaderVertexInput::VECTOR2); // uv
 		commandPtr->m_MetaData.m_VertexInputArray.push_back(EVulkanShaderVertexInput::VECTOR3); // normal
 		commandPtr->m_MetaData.m_VertexInputArray.push_back(EVulkanShaderVertexInput::VECTOR1); // material
-		g_VertexShaderIdentifier = commandPtr->m_Identifier;
+		m_VertexShaderIdentifier = commandPtr->m_Identifier;
 		});
 	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateShader>([&](auto* commandPtr) {
 		commandPtr->m_Identifier = VulkanGraphicsResourceShaderManager::GetInstance().AllocateIdentifier();
@@ -401,24 +417,22 @@ void VulkanGraphics::BuildRenderLoop()
 		commandPtr->m_MetaData.m_Name = "../Shaders/Output/coloredtriangle_frag.spv";
 		commandPtr->m_MetaData.m_InputBindingArray.push_back(EVulkanShaderBindingResource::TEXTURE2D); // samplerDiffuseHead
 		commandPtr->m_MetaData.m_InputBindingArray.push_back(EVulkanShaderBindingResource::TEXTURE2D); // samplerDiffuseBody
-		g_fragmentShaderIdentifier = commandPtr->m_Identifier;
+		m_fragmentShaderIdentifier = commandPtr->m_Identifier;
 		});
-
-	// TODO: still need to handle frame buffer and render pass...
 	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateGraphicsPipeline>([&](auto* commandPtr) {
 		commandPtr->m_Identifier = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().AllocateIdentifier();
-		commandPtr->m_InputData.m_RenderPassIndex = renderPassIndex; // this need to be reworked after modifying the render pass manager
+		commandPtr->m_InputData.m_RenderPassIdentifier = m_DefaultRenderPassIdentifier; // this need to be reworked after modifying the render pass manager
 		commandPtr->m_InputData.m_SubPassIndex = 0; // this need to be reworked after modifying the render pass manager
-		commandPtr->m_InputData.m_ShaderIdentifiers[EVulkanShaderType::VERTEX] = g_VertexShaderIdentifier;
-		commandPtr->m_InputData.m_ShaderIdentifiers[EVulkanShaderType::FRAGMENT] = g_fragmentShaderIdentifier;
-		g_PipelineIdentifier = commandPtr->m_Identifier;
+		commandPtr->m_InputData.m_ShaderIdentifiers[EVulkanShaderType::VERTEX] = m_VertexShaderIdentifier;
+		commandPtr->m_InputData.m_ShaderIdentifiers[EVulkanShaderType::FRAGMENT] = m_fragmentShaderIdentifier;
+		m_PipelineIdentifier = commandPtr->m_Identifier;
 		});
 
 	// Execute header commands (I handled in this way because still didn't create the descriptor set manager)....
 	VulnerableLayer::ExecuteAllCommands();
 
 
-	auto pipelineData = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().GetResource(g_PipelineIdentifier);
+	auto pipelineData = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().GetResource(m_PipelineIdentifier);
 	auto descriptorSetLayout = VulkanGraphicsResourceDescriptorSetLayoutManager::GetInstance().GetResource(pipelineData.m_DescriptorSetLayoutIdentifiers[EVulkanShaderType::FRAGMENT]);
 
 	auto poolSizeArray = std::vector<VkDescriptorPoolSize>();
@@ -435,39 +449,37 @@ void VulkanGraphics::BuildRenderLoop()
 	m_ResourcePipelineMgr.UpdateDescriptorSet(descriptorSetIndex, 1, m_CharacterBodyTexture.GetImageView(), m_CharacterBodySampler.GetSampler());
 
 
-	if (g_RenderingCommandBufferIdentifier == (size_t)-1)
+	if (m_RenderingCommandBufferIdentifier == (size_t)-1)
 	{
-		g_RenderingCommandBufferIdentifier = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().AllocateIdentifier();
+		m_RenderingCommandBufferIdentifier = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().AllocateIdentifier();
 
 		VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateCommandBuffer>([&](auto* commandPtr) {
-			commandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
+			commandPtr->m_Identifier = m_RenderingCommandBufferIdentifier;
 			commandPtr->m_InputData.m_CommandType = EVulkanCommandType::GRAPHICS;
 			commandPtr->m_InputData.m_IsTransient = false;
 			commandPtr->m_InputData.m_SortOrder = 1;
 			});
 
 		auto* recordingCommandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
-		recordingCommandPtr->m_Identifier = g_RenderingCommandBufferIdentifier;
+		recordingCommandPtr->m_Identifier = m_RenderingCommandBufferIdentifier;
 
 		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::BeginRenderPassExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
-			gfxExecutionPtr->m_RenderPassIndex = renderPassIndex;
-			gfxExecutionPtr->m_FramebufferIndex = m_FrontBufferIndexArray[0];
+			gfxExecutionPtr->m_RenderPassIdentifier = m_DefaultRenderPassIdentifier;
+			gfxExecutionPtr->m_FrameBufferIdentifier = m_FrontBufferIdentifierArray[0];
 			gfxExecutionPtr->m_FrameBufferColor = m_ColorBufferArray[0].GetImage();
 			gfxExecutionPtr->m_FrameBufferDepth = m_DepthBuffer.GetImage();
 			gfxExecutionPtr->m_RenderArea = { {0, 0}, {width, height} };
 			});
 		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::BindPipelineExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
-			gfxExecutionPtr->m_PipelineIdentifier = g_PipelineIdentifier;
+			gfxExecutionPtr->m_PipelineIdentifier = m_PipelineIdentifier;
 			});
 		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::PushConstantsExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
-			gfxExecutionPtr->m_PipelineIdentifier = g_PipelineIdentifier;
-
+			gfxExecutionPtr->m_PipelineIdentifier = m_PipelineIdentifier;
 			{
 				auto dataPtr = (uint8_t*)(&pushMVPMatrix);
 				size_t dataSize = sizeof(pushMVPMatrix);
 				gfxExecutionPtr->m_RawDataArrays[EVulkanShaderType::VERTEX].push_back(VulkanPushContstansRawData(dataPtr, dataPtr + dataSize));
 			}
-
 			{
 				auto dataPtr = (uint8_t*)(&mainLightDirection);
 				size_t dataSize = sizeof(mainLightDirection);
@@ -475,13 +487,13 @@ void VulkanGraphics::BuildRenderLoop()
 			}
 			});
 		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::BindDescriptorSetsExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
-			gfxExecutionPtr->m_PipelineIdentifier = g_PipelineIdentifier;
+			gfxExecutionPtr->m_PipelineIdentifier = m_PipelineIdentifier;
 			gfxExecutionPtr->m_DescriptorSetArray = std::vector<VkDescriptorSet>(m_ResourcePipelineMgr.GetDescriptorSetArray());
 			gfxExecutionPtr->m_GfxObjectUsage.m_ReadTextureArray.push_back(m_CharacterHeadTexture.GetImage());
 			gfxExecutionPtr->m_GfxObjectUsage.m_ReadTextureArray.push_back(m_CharacterBodyTexture.GetImage());
 			});
 		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::DrawIndexedExectuion>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
-			gfxExecutionPtr->m_PipelineIdentifier = g_PipelineIdentifier;
+			gfxExecutionPtr->m_PipelineIdentifier = m_PipelineIdentifier;
 			gfxExecutionPtr->m_VertexBuffer = m_CharacterMesh.GetVertexBuffer();
 			gfxExecutionPtr->m_IndexBuffer = m_CharacterMesh.GetIndexBuffer();
 			gfxExecutionPtr->m_InstanceCount = 1;
@@ -566,11 +578,13 @@ void VulkanGraphics::TransferAllStagingBuffers()
 #ifdef _WIN32
 void VulkanGraphics::InitializeGUI(HWND hWnd)
 {
-	std::vector<VkAttachmentDescription> attachmentDescArray;
+	m_ImGuiRenderPassIdentifier = VulkanGraphicsResourceRenderPassManager::GetInstance().AllocateIdentifier();
+
+	auto renderPassInputData = VulkanRenderPassInputData();
 	{
 		auto desc = VkAttachmentDescription();
 		desc.flags = 0;
-		desc.format = VulkanGraphicsResourceSwapchain::GetSwapchainFormat();
+		desc.format = VulkanGraphicsResourceSwapchain::GetInstance().GetSwapchainFormat();
 		desc.samples = VK_SAMPLE_COUNT_1_BIT; // TODO: need to be modified when starting to consider msaa...(NECESSARY!!!)
 		desc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -578,7 +592,7 @@ void VulkanGraphics::InitializeGUI(HWND hWnd)
 		desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		desc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-		attachmentDescArray.push_back(desc);
+		renderPassInputData.m_AttachmentDescriptionArray.push_back(desc);
 	}
 	{
 		auto desc = VkAttachmentDescription();
@@ -591,11 +605,10 @@ void VulkanGraphics::InitializeGUI(HWND hWnd)
 		desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		desc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-		attachmentDescArray.push_back(desc);
+		renderPassInputData.m_AttachmentDescriptionArray.push_back(desc);
 	}
 
 	// TODO: think about optimizable use-cases of subpass...one can be postprocess...
-	std::vector<VkSubpassDescription> subPassDescArray;
 	std::vector<VkAttachmentReference> subPassInputAttachmentArray;
 	std::vector<VkAttachmentReference> subPassColorAttachmentArray;
 	auto subPassDepthStencilAttachment = VkAttachmentReference();
@@ -633,11 +646,10 @@ void VulkanGraphics::InitializeGUI(HWND hWnd)
 		desc.pDepthStencilAttachment = &subPassDepthStencilAttachment;
 		desc.preserveAttachmentCount = subPassPreserveAttachmentArray.size();
 		desc.pPreserveAttachments = subPassPreserveAttachmentArray.data();
-		subPassDescArray.push_back(desc);
+		renderPassInputData.m_SubpassDescriptionArray.push_back(desc);
 	}
 
 	// TODO: still it's not perfectly clear... let's study more on this...
-	std::vector<VkSubpassDependency> subPassDepArray;
 	{
 		auto dep = VkSubpassDependency();
 		dep.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -647,10 +659,10 @@ void VulkanGraphics::InitializeGUI(HWND hWnd)
 		dep.srcAccessMask = 0;
 		dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 		dep.dependencyFlags = 0;
-		subPassDepArray.push_back(dep);
+		renderPassInputData.m_SubpassDependencyArray.push_back(dep);
 	}
 
-	gImGuiRenderPassIndex = VulkanGraphicsResourceRenderPassManager::CreateRenderPass(attachmentDescArray, subPassDescArray, subPassDepArray);
+	VulkanGraphicsResourceRenderPassManager::GetInstance().CreateResource(m_ImGuiRenderPassIdentifier, renderPassInputData, m_ImGuiRenderPassIdentifier);
 
 	auto poolSizeArray = std::vector<VkDescriptorPoolSize>();
 	{
@@ -720,9 +732,9 @@ void VulkanGraphics::InitializeGUI(HWND hWnd)
 		poolSizeArray.push_back(poolSize);
 	}
 
-	gImGuiDescriptorPoolIndex = VulkanGraphicsResourcePipelineManager::CreateDescriptorPool(poolSizeArray);
+	m_ImGuiDescriptorPoolIndex = VulkanGraphicsResourcePipelineManager::CreateDescriptorPool(poolSizeArray);
 
-	auto descriptorPool = VulkanGraphicsResourcePipelineManager::GetDescriptorPool(gImGuiDescriptorPoolIndex);
+	auto descriptorPool = VulkanGraphicsResourcePipelineManager::GetDescriptorPool(m_ImGuiDescriptorPoolIndex);
 
 	//gImGuiWindow.Surface = VulkanGraphicsResourceSurface::GetSurface();
 	//gImGuiWindow.SurfaceFormat = VkSurfaceFormatKHR { VK_FORMAT_R8G8B8A8_UNORM, VK_COLORSPACE_SRGB_NONLINEAR_KHR };
@@ -735,19 +747,19 @@ void VulkanGraphics::InitializeGUI(HWND hWnd)
 	ImGui_ImplWin32_Init(hWnd);
 
 	ImGui_ImplVulkan_InitInfo init_info = {};
-	init_info.Instance = VulkanGraphicsResourceInstance::GetInstance();
-	init_info.PhysicalDevice = VulkanGraphicsResourceDevice::GetPhysicalDevice();
-	init_info.Device = VulkanGraphicsResourceDevice::GetLogicalDevice();
-	init_info.QueueFamily = VulkanGraphicsResourceDevice::GetGraphicsQueueFamilyIndex();
-	init_info.Queue = VulkanGraphicsResourceDevice::GetGraphicsQueue();
-	init_info.PipelineCache = VulkanGraphicsResourcePipelineManager::GetPipelineCache();
+	init_info.Instance = VulkanGraphicsResourceInstance::GetInstance().GetVkInstance();
+	init_info.PhysicalDevice = VulkanGraphicsResourceDevice::GetInstance().GetPhysicalDevice();
+	init_info.Device = VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice();
+	init_info.QueueFamily = VulkanGraphicsResourceDevice::GetInstance().GetGraphicsQueueFamilyIndex();
+	init_info.Queue = VulkanGraphicsResourceDevice::GetInstance().GetGraphicsQueue();
+	init_info.PipelineCache = VulkanGraphicsResourcePipelineCache::GetInstance().GetPipelineCache();
 	init_info.DescriptorPool = descriptorPool;
 	init_info.Allocator = NULL;
 	init_info.MinImageCount = 2;
-	init_info.ImageCount = VulkanGraphicsResourceSwapchain::GetImageViewCount();
+	init_info.ImageCount = VulkanGraphicsResourceSwapchain::GetInstance().GetImageViewCount();
 	init_info.CheckVkResultFn = check_vk_result;
-	ImGui_ImplVulkan_Init(&init_info, VulkanGraphicsResourceRenderPassManager::GetRenderPass(gImGuiRenderPassIndex)); // TODO: will we need to make an individual render pass?
-	gImGuiFontUpdated = false;
+	ImGui_ImplVulkan_Init(&init_info, VulkanGraphicsResourceRenderPassManager::GetInstance().GetResource(m_ImGuiRenderPassIdentifier)); // TODO: will we need to make an individual render pass?
+	m_ImGuiFontUpdated = false;
 
 	auto imageInfo = VkDescriptorImageInfo();
 	imageInfo.sampler = m_ColorBufferSampler.GetSampler();
@@ -763,19 +775,20 @@ void VulkanGraphics::DeinitializeGUI()
 {
 	ImGui_ImplVulkan_Shutdown();
 	ImGui::DestroyContext();
-	gImGuiFontUpdated = false;
-	VulkanGraphicsResourcePipelineManager::DestroyDescriptorPool(gImGuiDescriptorPoolIndex);
-	VulkanGraphicsResourceRenderPassManager::DestroyRenderPass(gImGuiRenderPassIndex);
-	gImGuiDescriptorPoolIndex = -1;
-	gImGuiRenderPassIndex = -1;
+	m_ImGuiFontUpdated = false;
+	VulkanGraphicsResourcePipelineManager::DestroyDescriptorPool(m_ImGuiDescriptorPoolIndex);
+	VulkanGraphicsResourceRenderPassManager::GetInstance().DestroyResource(m_ImGuiRenderPassIdentifier);
+	VulkanGraphicsResourceRenderPassManager::GetInstance().ReleaseIdentifier(m_ImGuiRenderPassIdentifier);
+	m_ImGuiRenderPassIdentifier = -1;
+	m_ImGuiDescriptorPoolIndex = -1;
 }
 
 void VulkanGraphics::DrawGUI(VkSemaphore& acquireNextImageSemaphore)
 {
 	// Upload Fonts
-	if (!gImGuiFontUpdated)
+	if (!m_ImGuiFontUpdated)
 	{
-		gImGuiFontUpdated = true;
+		m_ImGuiFontUpdated = true;
 
 		size_t commandBufferIdentifier = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().AllocateIdentifier();
 		VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateCommandBuffer>([&](auto* commandPtr) {
@@ -821,12 +834,12 @@ void VulkanGraphics::DrawGUI(VkSemaphore& acquireNextImageSemaphore)
 		recordingCommandPtr->m_Identifier = commandBufferIdentifier;
 
 		uint32_t width, height, imageIndex;
-		m_ResourceSwapchain.GetSwapchainSize(width, height);
-		imageIndex = VulkanGraphicsResourceSwapchain::GetAcquiredImageIndex();
+		VulkanGraphicsResourceSwapchain::GetInstance().GetSwapchainSize(width, height);
+		imageIndex = VulkanGraphicsResourceSwapchain::GetInstance().GetAcquiredImageIndex();
 		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::BeginRenderPassExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
-			gfxExecutionPtr->m_RenderPassIndex = gImGuiRenderPassIndex;
-			gfxExecutionPtr->m_FramebufferIndex = m_BackBufferIndexArray[imageIndex];
-			gfxExecutionPtr->m_FrameBufferColor = m_ResourceSwapchain.GetImage(imageIndex);
+			gfxExecutionPtr->m_RenderPassIdentifier = m_ImGuiRenderPassIdentifier;
+			gfxExecutionPtr->m_FrameBufferIdentifier = m_BackBufferIdentifierArray[imageIndex];
+			gfxExecutionPtr->m_FrameBufferColor = VulkanGraphicsResourceSwapchain::GetInstance().GetImage(imageIndex);
 			gfxExecutionPtr->m_FrameBufferDepth = m_DepthBuffer.GetImage();
 			gfxExecutionPtr->m_RenderArea = { {0, 0}, {width, height} };
 			});
@@ -837,52 +850,3 @@ void VulkanGraphics::DrawGUI(VkSemaphore& acquireNextImageSemaphore)
 	}
 }
 
-void VulkanGraphics::CreateDescriptorSet()
-{
-	auto poolSizeArray = new VkDescriptorPoolSize[1];
-	poolSizeArray[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSizeArray[0].descriptorCount = 1;
-
-	auto createInfo = VkDescriptorPoolCreateInfo();
-	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	createInfo.pNext = NULL;
-	createInfo.maxSets = 1;
-	createInfo.poolSizeCount = 1;
-	createInfo.pPoolSizes = poolSizeArray;
-
-	auto result = vkCreateDescriptorPool(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &m_DescriptorPool);
-
-	if (result)
-	{
-		printf_console("[VulkanGraphics] failed to create a descriptor pool with error code %d\n", result);
-		throw;
-	}
-
-	auto allocationInfo = VkDescriptorSetAllocateInfo();
-	allocationInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocationInfo.pNext = NULL;
-	allocationInfo.descriptorPool = m_DescriptorPool;
-	allocationInfo.descriptorSetCount = 1;
-	allocationInfo.pSetLayouts = &m_DescriptorSetLayout;
-	result = vkAllocateDescriptorSets(VulkanGraphicsResourceDevice::GetLogicalDevice(), &allocationInfo, &m_DescriptorSet); // TODO: in the future let's allocate multiple descriptor sets at the same time
-
-	if (result)
-	{
-		printf_console("[VulkanGraphics] failed to allocate a descriptor set with error code %d\n", result);
-		throw;
-	}
-
-	auto bufferInfo = VkDescriptorBufferInfo();
-	bufferInfo.buffer = m_MVPMatrixUniformBuffer.GetBuffer();
-	bufferInfo.offset = 0;
-	bufferInfo.range = sizeof(m_MVPMatrixUniformBuffer);
-
-	auto writeDescriptorSet = VkWriteDescriptorSet();
-	vkUpdateDescriptorSets(VulkanGraphicsResourceDevice::GetLogicalDevice(), 1, &writeDescriptorSet, 0, NULL); // TODO: let's figure out what the copy descriptor set is for...
-}
-
-void VulkanGraphics::DestroyDescriptorSet()
-{
-	vkFreeDescriptorSets(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_DescriptorPool, 1, &m_DescriptorSet);
-	vkDestroyDescriptorPool(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_DescriptorPool, NULL);
-}

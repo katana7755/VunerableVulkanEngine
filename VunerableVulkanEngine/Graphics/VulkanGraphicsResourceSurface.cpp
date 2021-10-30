@@ -6,12 +6,12 @@
 #include "vulkan/vulkan_win32.h" // TODO: need to consider other platfroms such as Android, Linux etc... in the future
 #endif
 
-VkSurfaceKHR VulkanGraphicsResourceSurface::s_Surface;
+VulkanGraphicsResourceSurface g_Instance;
 
-#ifdef _WIN32
-HINSTANCE VulkanGraphicsResourceSurface::s_HInstance;
-HWND VulkanGraphicsResourceSurface::s_HWnd;
-#endif
+VulkanGraphicsResourceSurface& VulkanGraphicsResourceSurface::GetInstance()
+{
+	return g_Instance;
+}
 
 bool VulkanGraphicsResourceSurface::CreateInternal()
 {
@@ -22,9 +22,9 @@ bool VulkanGraphicsResourceSurface::CreateInternal()
 	createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
 	createInfo.pNext = NULL;
 	createInfo.flags = 0;
-	createInfo.hinstance = s_HInstance;
-	createInfo.hwnd = s_HWnd;
-	result = vkCreateWin32SurfaceKHR(VulkanGraphicsResourceInstance::GetInstance(), &createInfo, NULL, &s_Surface);
+	createInfo.hinstance = m_HInstance;
+	createInfo.hwnd = m_HWnd;
+	result = vkCreateWin32SurfaceKHR(VulkanGraphicsResourceInstance::GetInstance().GetVkInstance(), &createInfo, NULL, &m_Surface);
 #endif
 
 	if (result)
@@ -39,6 +39,6 @@ bool VulkanGraphicsResourceSurface::CreateInternal()
 
 bool VulkanGraphicsResourceSurface::DestroyInternal()
 {
-	vkDestroySurfaceKHR(VulkanGraphicsResourceInstance::GetInstance(), s_Surface, NULL);
+	vkDestroySurfaceKHR(VulkanGraphicsResourceInstance::GetInstance().GetVkInstance(), m_Surface, NULL);
 	return true;
 }

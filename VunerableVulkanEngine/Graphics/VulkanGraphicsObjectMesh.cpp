@@ -365,10 +365,10 @@ bool VulkanGraphicsObjectMesh::CreateInternal()
 
 bool VulkanGraphicsObjectMesh::DestroyInternal()
 {
-	vkFreeMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_GPUIndexMemory, NULL);
-	vkDestroyBuffer(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_GPUIndexBuffer, NULL);
-	vkFreeMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_GPUVertexMemory, NULL);
-	vkDestroyBuffer(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_GPUVertexBuffer, NULL);
+	vkFreeMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_GPUIndexMemory, NULL);
+	vkDestroyBuffer(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_GPUIndexBuffer, NULL);
+	vkFreeMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_GPUVertexMemory, NULL);
+	vkDestroyBuffer(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_GPUVertexBuffer, NULL);
 
 	if (gFBXScenePtr != NULL)
 	{
@@ -397,7 +397,7 @@ void VulkanGraphicsObjectMesh::CreateGPUResource(VkBuffer& gpuBuffer, VkDeviceMe
 	createInfo.queueFamilyIndexCount = 0;
 	createInfo.pQueueFamilyIndices = NULL;
 
-	auto result = vkCreateBuffer(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &gpuBuffer);
+	auto result = vkCreateBuffer(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &createInfo, NULL, &gpuBuffer);
 
 	if (result)
 	{
@@ -407,11 +407,11 @@ void VulkanGraphicsObjectMesh::CreateGPUResource(VkBuffer& gpuBuffer, VkDeviceMe
 	}
 
 	auto requirements = VkMemoryRequirements();
-	vkGetBufferMemoryRequirements(VulkanGraphicsResourceDevice::GetLogicalDevice(), gpuBuffer, &requirements);
+	vkGetBufferMemoryRequirements(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), gpuBuffer, &requirements);
 
 	uint32_t memoryTypeIndex;
 
-	if (!VulkanGraphicsResourceDevice::GetMemoryTypeIndex(requirements.memoryTypeBits, memoryFlags, &memoryTypeIndex))
+	if (!VulkanGraphicsResourceDevice::GetInstance().GetMemoryTypeIndex(requirements.memoryTypeBits, memoryFlags, &memoryTypeIndex))
 	{
 		printf_console("[VulkanGraphics] failed to get a memory type index for this mesh with error code %d\n", result);
 
@@ -423,7 +423,7 @@ void VulkanGraphicsObjectMesh::CreateGPUResource(VkBuffer& gpuBuffer, VkDeviceMe
 	allocateInfo.pNext = NULL;
 	allocateInfo.allocationSize = requirements.size;
 	allocateInfo.memoryTypeIndex = memoryTypeIndex;
-	result = vkAllocateMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), &allocateInfo, NULL, &gpuMemory);
+	result = vkAllocateMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &allocateInfo, NULL, &gpuMemory);
 
 	if (result)
 	{
@@ -432,7 +432,7 @@ void VulkanGraphicsObjectMesh::CreateGPUResource(VkBuffer& gpuBuffer, VkDeviceMe
 		throw;
 	}
 
-	result = vkBindBufferMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), gpuBuffer, gpuMemory, 0);
+	result = vkBindBufferMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), gpuBuffer, gpuMemory, 0);
 
 	if (result)
 	{
@@ -444,15 +444,15 @@ void VulkanGraphicsObjectMesh::CreateGPUResource(VkBuffer& gpuBuffer, VkDeviceMe
 	// ***** Let's create a function for creating new buffer...
 	// ***** Need To Implement Actual Binding...
 	void* bufferPtr;
-	vkMapMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), gpuMemory, 0, dataSize, 0, &bufferPtr);
+	vkMapMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), gpuMemory, 0, dataSize, 0, &bufferPtr);
 	memcpy(bufferPtr, dataPtr, dataSize);
-	vkUnmapMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), gpuMemory);
+	vkUnmapMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), gpuMemory);
 
 	// ***** And Transfer Through Transient Command Buffer...
 }
 
 void VulkanGraphicsObjectMesh::DestroyGPUResource(VkBuffer& gpuBuffer, VkDeviceMemory& gpuMemory)
 {
-	vkFreeMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), gpuMemory, NULL);
-	vkDestroyBuffer(VulkanGraphicsResourceDevice::GetLogicalDevice(), gpuBuffer, NULL);
+	vkFreeMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), gpuMemory, NULL);
+	vkDestroyBuffer(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), gpuBuffer, NULL);
 }

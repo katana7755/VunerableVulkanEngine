@@ -26,8 +26,6 @@ public:
 	static const VkPipelineLayout& GetPipelineLayout(int index);
 	static void DestroyPipelineLayout(int index);
 	static void BeginToCreateGraphicsPipeline();
-	static int CreateGraphicsPipeline(const size_t vertexShaderIdentifier, const size_t fragmentShaderIdentifier, int pipelineLayoutIndex, int renderPassIndex, int subPassIndex);
-	//static int CreateGraphicsPipeline(int vertexShaderModuleIndex, int fragmentShaderModuleIndex, int pipelineLayoutIndex, int renderPassIndex, int subPassIndex);
 	static void EndToCreateGraphicsPipeline();
 	static const VkPipeline& GetGraphicsPipeline(int index);
 	static void DestroyGraphicsPipeline(int index);

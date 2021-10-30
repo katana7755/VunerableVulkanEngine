@@ -4,17 +4,13 @@
 class VulkanGraphicsResourceInstance : public VulkanGraphicsResourceBase
 {
 public:
-	static const VkInstance& GetInstance()
+	static VulkanGraphicsResourceInstance& GetInstance();
+
+public:
+	const VkInstance& GetVkInstance()
 	{
-		return s_Instance;
+		return m_VkInstance;
 	}
-
-private:
-	static VkInstance s_Instance;
-
-#if _DEBUG
-	static VkDebugUtilsMessengerEXT s_DebugCallbackMessenger;
-#endif
 
 protected:
 	virtual bool CreateInternal() override;
@@ -23,6 +19,13 @@ protected:
 #if _DEBUG
 	VkResult CreateDebugUtilsMessenger();
 	void DestroyDebugUtilsMessenger();
+#endif
+
+private:
+	VkInstance m_VkInstance;
+
+#if _DEBUG
+	VkDebugUtilsMessengerEXT m_DebugCallbackMessenger;
 #endif
 };
 

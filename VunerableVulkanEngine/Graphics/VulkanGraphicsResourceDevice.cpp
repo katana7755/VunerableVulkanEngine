@@ -4,17 +4,12 @@
 #include "VulkanGraphicsResourceSurface.h"
 #include <set>
 
-std::vector<VkPhysicalDevice> VulkanGraphicsResourceDevice::s_PhysicalDeviceArray; // TODO: Think about removing this because it seems redundant...
-int VulkanGraphicsResourceDevice::s_PhysicalDeviceIndex = -1;
-int VulkanGraphicsResourceDevice::s_GraphicsQueueFamilyIndex = -1;
-int VulkanGraphicsResourceDevice::s_PresentQueueFamilyIndex = -1;
-int VulkanGraphicsResourceDevice::s_ComputeQueueFamilyIndex = -1;
-VkDevice VulkanGraphicsResourceDevice::s_LogicalDevice;
-VkPhysicalDeviceProperties VulkanGraphicsResourceDevice::s_PhysicalDeviceProperties;
-VkSurfaceCapabilitiesKHR VulkanGraphicsResourceDevice::s_SurfaceCapabilities;
-std::vector<VkSurfaceFormatKHR> VulkanGraphicsResourceDevice::s_SurfaceFormatArray;
-VkPhysicalDeviceMemoryProperties VulkanGraphicsResourceDevice::s_MemoryProperties;
-std::unordered_map<int, VkQueue> VulkanGraphicsResourceDevice::s_QueueMap;
+VulkanGraphicsResourceDevice g_Instance;
+
+VulkanGraphicsResourceDevice& VulkanGraphicsResourceDevice::GetInstance()
+{
+	return g_Instance;
+}
 
 bool VulkanGraphicsResourceDevice::CreateInternal()
 {
@@ -32,7 +27,7 @@ bool VulkanGraphicsResourceDevice::DestroyInternal()
 bool VulkanGraphicsResourceDevice::EnumeratePhysicalDevices()
 {
 	uint32_t count = 0;
-	auto result = vkEnumeratePhysicalDevices(VulkanGraphicsResourceInstance::GetInstance(), &count, NULL);
+	auto result = vkEnumeratePhysicalDevices(VulkanGraphicsResourceInstance::GetInstance().GetVkInstance(), &count, NULL);
 
 	if (result)
 	{
@@ -40,8 +35,8 @@ bool VulkanGraphicsResourceDevice::EnumeratePhysicalDevices()
 		return false;
 	}
 
-	s_PhysicalDeviceArray.resize(count);
-	result = vkEnumeratePhysicalDevices(VulkanGraphicsResourceInstance::GetInstance(), &count, s_PhysicalDeviceArray.data());
+	m_PhysicalDeviceArray.resize(count);
+	result = vkEnumeratePhysicalDevices(VulkanGraphicsResourceInstance::GetInstance().GetVkInstance(), &count, m_PhysicalDeviceArray.data());
 
 	if (result)
 	{
@@ -49,7 +44,7 @@ bool VulkanGraphicsResourceDevice::EnumeratePhysicalDevices()
 		return false;
 	}
 
-	printf_console("[VulkanGraphics] physical device count is %d\n", s_PhysicalDeviceArray.size());
+	printf_console("[VulkanGraphics] physical device count is %d\n", m_PhysicalDeviceArray.size());
 	return true;
 }
 
@@ -101,16 +96,17 @@ bool VulkanGraphicsResourceDevice::CreateLogicalDevice()
 	uint32_t count = 0;
 	std::vector<VkQueueFamilyProperties> queueFamilyPropertiesArray;
 
-	for (int i = 0; i < s_PhysicalDeviceArray.size(); ++i)
+	for (int i = 0; i < m_PhysicalDeviceArray.size(); ++i)
 	{
 		printf_console("\t%d device ++++++++++\n", i);
-		s_PhysicalDeviceIndex = -1;
-		s_GraphicsQueueFamilyIndex = -1;
-		s_PresentQueueFamilyIndex = -1;
+		m_PhysicalDeviceIndex = -1;
+		m_GraphicsQueueFamilyIndex = -1;
+		m_PresentQueueFamilyIndex = -1;
+		m_ComputeQueueFamilyIndex = -1;
 		potentialOptions.clear();
-		vkGetPhysicalDeviceQueueFamilyProperties(s_PhysicalDeviceArray[i], &count, NULL);
+		vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDeviceArray[i], &count, NULL);
 		queueFamilyPropertiesArray.resize(count);
-		vkGetPhysicalDeviceQueueFamilyProperties(s_PhysicalDeviceArray[i], &count, queueFamilyPropertiesArray.data());
+		vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDeviceArray[i], &count, queueFamilyPropertiesArray.data());
 		printf_console("\t+ queue famility count: %d\n", count);
 
 		for (int j = 0; j < count; ++j)
@@ -146,7 +142,7 @@ bool VulkanGraphicsResourceDevice::CreateLogicalDevice()
 
 			{
 				VkBool32 doesSupportPresent = VK_FALSE;
-				vkGetPhysicalDeviceSurfaceSupportKHR(s_PhysicalDeviceArray[i], j, VulkanGraphicsResourceSurface::GetSurface(), &doesSupportPresent);
+				vkGetPhysicalDeviceSurfaceSupportKHR(m_PhysicalDeviceArray[i], j, VulkanGraphicsResourceSurface::GetInstance().GetSurface(), &doesSupportPresent);
 
 				if (doesSupportPresent == VK_TRUE)
 				{
@@ -167,16 +163,16 @@ bool VulkanGraphicsResourceDevice::CreateLogicalDevice()
 			continue;
 		}
 
-		s_PhysicalDeviceIndex = i;
+		m_PhysicalDeviceIndex = i;
 
 		for (int j = 0; j < potentialOptions.size(); ++j)
 		{
-			potentialOptions[j].TryToSetGraphicsQueueFamilyIndex(s_GraphicsQueueFamilyIndex);
-			potentialOptions[j].TryToSetPresentQueueFamilyIndex(s_PresentQueueFamilyIndex);
-			potentialOptions[j].TryToSetComputeQueueFamilyIndex(s_ComputeQueueFamilyIndex);
+			potentialOptions[j].TryToSetGraphicsQueueFamilyIndex(m_GraphicsQueueFamilyIndex);
+			potentialOptions[j].TryToSetPresentQueueFamilyIndex(m_PresentQueueFamilyIndex);
+			potentialOptions[j].TryToSetComputeQueueFamilyIndex(m_ComputeQueueFamilyIndex);
 		}
 
-		if (s_GraphicsQueueFamilyIndex == -1 || s_PresentQueueFamilyIndex == -1 || s_ComputeQueueFamilyIndex == -1)
+		if (m_GraphicsQueueFamilyIndex == -1 || m_PresentQueueFamilyIndex == -1 || m_ComputeQueueFamilyIndex == -1)
 		{
 			continue;
 		}
@@ -188,24 +184,24 @@ bool VulkanGraphicsResourceDevice::CreateLogicalDevice()
 		queueCreateInfo.pNext = NULL;
 		queueCreateInfo.queueCount = 1;
 		queueCreateInfo.pQueuePriorities = new float[] { 0.0 };
-		queueCreateInfo.queueFamilyIndex = s_GraphicsQueueFamilyIndex;
+		queueCreateInfo.queueFamilyIndex = m_GraphicsQueueFamilyIndex;
 		queueCreateInfoArray.push_back(queueCreateInfo);
 
 		auto queueSet = std::set<int>();
-		queueSet.insert(s_GraphicsQueueFamilyIndex);
+		queueSet.insert(m_GraphicsQueueFamilyIndex);
 
-		if (queueSet.find(s_PresentQueueFamilyIndex) == queueSet.end())
+		if (queueSet.find(m_PresentQueueFamilyIndex) == queueSet.end())
 		{
-			queueCreateInfo.queueFamilyIndex = s_PresentQueueFamilyIndex;
+			queueCreateInfo.queueFamilyIndex = m_PresentQueueFamilyIndex;
 			queueCreateInfoArray.push_back(queueCreateInfo);
-			queueSet.insert(s_PresentQueueFamilyIndex);
+			queueSet.insert(m_PresentQueueFamilyIndex);
 		}
 
-		if (queueSet.find(s_ComputeQueueFamilyIndex) == queueSet.end())
+		if (queueSet.find(m_ComputeQueueFamilyIndex) == queueSet.end())
 		{
-			queueCreateInfo.queueFamilyIndex = s_ComputeQueueFamilyIndex;
+			queueCreateInfo.queueFamilyIndex = m_ComputeQueueFamilyIndex;
 			queueCreateInfoArray.push_back(queueCreateInfo);
-			queueSet.insert(s_ComputeQueueFamilyIndex);
+			queueSet.insert(m_ComputeQueueFamilyIndex);
 		}
 
 		auto extensionNameArray = std::vector<const char*>();
@@ -222,7 +218,7 @@ bool VulkanGraphicsResourceDevice::CreateLogicalDevice()
 		deviceCreateInfo.ppEnabledLayerNames = NULL;
 		deviceCreateInfo.pEnabledFeatures = NULL;
 
-		auto result = vkCreateDevice(s_PhysicalDeviceArray[s_PhysicalDeviceIndex], &deviceCreateInfo, NULL, &s_LogicalDevice);
+		auto result = vkCreateDevice(m_PhysicalDeviceArray[m_PhysicalDeviceIndex], &deviceCreateInfo, NULL, &m_LogicalDevice);
 
 		if (result)
 		{
@@ -230,58 +226,58 @@ bool VulkanGraphicsResourceDevice::CreateLogicalDevice()
 			continue;
 		}
 
-		vkGetPhysicalDeviceProperties(s_PhysicalDeviceArray[i], &s_PhysicalDeviceProperties);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(s_PhysicalDeviceArray[s_PhysicalDeviceIndex], VulkanGraphicsResourceSurface::GetSurface(), &count, NULL);
-		s_SurfaceFormatArray.resize(count);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(s_PhysicalDeviceArray[s_PhysicalDeviceIndex], VulkanGraphicsResourceSurface::GetSurface(), &count, s_SurfaceFormatArray.data());
+		vkGetPhysicalDeviceProperties(m_PhysicalDeviceArray[i], &m_PhysicalDeviceProperties);
+		vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDeviceArray[m_PhysicalDeviceIndex], VulkanGraphicsResourceSurface::GetInstance().GetSurface(), &count, NULL);
+		m_SurfaceFormatArray.resize(count);
+		vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDeviceArray[m_PhysicalDeviceIndex], VulkanGraphicsResourceSurface::GetInstance().GetSurface(), &count, m_SurfaceFormatArray.data());
 
-		if (s_SurfaceFormatArray.size() <= 0)
+		if (m_SurfaceFormatArray.size() <= 0)
 		{
 			continue;
 		}
 
-		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(s_PhysicalDeviceArray[s_PhysicalDeviceIndex], VulkanGraphicsResourceSurface::GetSurface(), &s_SurfaceCapabilities);
-		vkGetPhysicalDeviceMemoryProperties(s_PhysicalDeviceArray[s_PhysicalDeviceIndex], &s_MemoryProperties);
-		printf_console("\t+ local device is created with the physical device %d\n", s_PhysicalDeviceIndex);
+		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysicalDeviceArray[m_PhysicalDeviceIndex], VulkanGraphicsResourceSurface::GetInstance().GetSurface(), &m_SurfaceCapabilities);
+		vkGetPhysicalDeviceMemoryProperties(m_PhysicalDeviceArray[m_PhysicalDeviceIndex], &m_MemoryProperties);
+		printf_console("\t+ local device is created with the physical device %d\n", m_PhysicalDeviceIndex);
 		printf_console("\t+++++ [Surface Formant] count : %d\n", count);
 
 		for (int j = 0; j < count; ++j)
 		{
 			printf_console("\t++++++++++ index: %d\n", j);
-			printf_console("\t+++++++++++++++ format: %d\n", s_SurfaceFormatArray[j].format);
-			printf_console("\t+++++++++++++++ colorSpace: %d\n", s_SurfaceFormatArray[j].colorSpace);
+			printf_console("\t+++++++++++++++ format: %d\n", m_SurfaceFormatArray[j].format);
+			printf_console("\t+++++++++++++++ colorSpace: %d\n", m_SurfaceFormatArray[j].colorSpace);
 		}
 
 		printf_console("\t+++++ [Surface Capabilities]\n");
-		printf_console("\t++++++++++ minImageCount: %d\n", s_SurfaceCapabilities.minImageCount);
-		printf_console("\t++++++++++ maxImageCount: %d\n", s_SurfaceCapabilities.maxImageCount);
-		printf_console("\t++++++++++ currentExtent (%d, %d)\n", s_SurfaceCapabilities.currentExtent.width, s_SurfaceCapabilities.currentExtent.height);
-		printf_console("\t++++++++++ minImageExtent (%d, %d)\n", s_SurfaceCapabilities.minImageExtent.width, s_SurfaceCapabilities.minImageExtent.height);
-		printf_console("\t++++++++++ maxImageExtent (%d, %d)\n", s_SurfaceCapabilities.maxImageExtent.width, s_SurfaceCapabilities.maxImageExtent.height);
-		printf_console("\t++++++++++ maxImageArrayLayers: %d\n", s_SurfaceCapabilities.maxImageArrayLayers);
-		printf_console("\t++++++++++ supportedTransforms: %x\n", s_SurfaceCapabilities.supportedTransforms);
-		printf_console("\t++++++++++ currentTransform: %x\n", s_SurfaceCapabilities.currentTransform);
-		printf_console("\t++++++++++ supportedCompositeAlpha: %x\n", s_SurfaceCapabilities.supportedCompositeAlpha);
-		printf_console("\t++++++++++ supportedUsageFlags: %x\n", s_SurfaceCapabilities.supportedUsageFlags);
+		printf_console("\t++++++++++ minImageCount: %d\n", m_SurfaceCapabilities.minImageCount);
+		printf_console("\t++++++++++ maxImageCount: %d\n", m_SurfaceCapabilities.maxImageCount);
+		printf_console("\t++++++++++ currentExtent (%d, %d)\n", m_SurfaceCapabilities.currentExtent.width, m_SurfaceCapabilities.currentExtent.height);
+		printf_console("\t++++++++++ minImageExtent (%d, %d)\n", m_SurfaceCapabilities.minImageExtent.width, m_SurfaceCapabilities.minImageExtent.height);
+		printf_console("\t++++++++++ maxImageExtent (%d, %d)\n", m_SurfaceCapabilities.maxImageExtent.width, m_SurfaceCapabilities.maxImageExtent.height);
+		printf_console("\t++++++++++ maxImageArrayLayers: %d\n", m_SurfaceCapabilities.maxImageArrayLayers);
+		printf_console("\t++++++++++ supportedTransforms: %x\n", m_SurfaceCapabilities.supportedTransforms);
+		printf_console("\t++++++++++ currentTransform: %x\n", m_SurfaceCapabilities.currentTransform);
+		printf_console("\t++++++++++ supportedCompositeAlpha: %x\n", m_SurfaceCapabilities.supportedCompositeAlpha);
+		printf_console("\t++++++++++ supportedUsageFlags: %x\n", m_SurfaceCapabilities.supportedUsageFlags);
 		printf_console("\t+++++ [Memory Capabilities]\n");
-		printf_console("\t++++++++++ memoryTypeCount: %d\n", s_MemoryProperties.memoryTypeCount);
+		printf_console("\t++++++++++ memoryTypeCount: %d\n", m_MemoryProperties.memoryTypeCount);
 
-		for (int j = 0; j < s_MemoryProperties.memoryTypeCount; ++j)
+		for (int j = 0; j < m_MemoryProperties.memoryTypeCount; ++j)
 		{
-			printf_console("\t+++++++++++++++ memoryType: %d\n", s_MemoryProperties.memoryTypes[j]);
+			printf_console("\t+++++++++++++++ memoryType: %d\n", m_MemoryProperties.memoryTypes[j]);
 		}
 
-		printf_console("\t++++++++++ memoryHeapCount: %d\n", s_MemoryProperties.memoryHeapCount);
+		printf_console("\t++++++++++ memoryHeapCount: %d\n", m_MemoryProperties.memoryHeapCount);
 
-		for (int j = 0; j < s_MemoryProperties.memoryHeapCount; ++j)
+		for (int j = 0; j < m_MemoryProperties.memoryHeapCount; ++j)
 		{
-			printf_console("\t+++++++++++++++ memoryHeap: %d\n", s_MemoryProperties.memoryHeaps[j]);
+			printf_console("\t+++++++++++++++ memoryHeap: %d\n", m_MemoryProperties.memoryHeaps[j]);
 		}
 
-		s_QueueMap.clear();
-		GetDeviceQueueOnlyIfNotExist(s_GraphicsQueueFamilyIndex);
-		GetDeviceQueueOnlyIfNotExist(s_PresentQueueFamilyIndex);
-		GetDeviceQueueOnlyIfNotExist(s_ComputeQueueFamilyIndex);
+		m_QueueMap.clear();
+		GetDeviceQueueOnlyIfNotExist(m_GraphicsQueueFamilyIndex);
+		GetDeviceQueueOnlyIfNotExist(m_PresentQueueFamilyIndex);
+		GetDeviceQueueOnlyIfNotExist(m_ComputeQueueFamilyIndex);
 
 		return true;
 	}
@@ -293,21 +289,22 @@ bool VulkanGraphicsResourceDevice::CreateLogicalDevice()
 
 bool VulkanGraphicsResourceDevice::DestroyLogicalDevice()
 {
-	vkDestroyDevice(s_LogicalDevice, NULL);
-	s_PhysicalDeviceIndex = -1;
-	s_GraphicsQueueFamilyIndex = -1;
-	s_PresentQueueFamilyIndex = -1;
+	vkDestroyDevice(m_LogicalDevice, NULL);
+	m_PhysicalDeviceIndex = -1;
+	m_GraphicsQueueFamilyIndex = -1;
+	m_PresentQueueFamilyIndex = -1;
+	m_ComputeQueueFamilyIndex = -1;
 	return true;
 }
 
 void VulkanGraphicsResourceDevice::GetDeviceQueueOnlyIfNotExist(int queueFamilyIndex)
 {
-	if (s_QueueMap.find(queueFamilyIndex) != s_QueueMap.end())
+	if (m_QueueMap.find(queueFamilyIndex) != m_QueueMap.end())
 	{
 		return;
 	}
 
 	auto newQueue = VkQueue();
-	vkGetDeviceQueue(s_LogicalDevice, queueFamilyIndex, 0, &newQueue);
-	s_QueueMap[queueFamilyIndex] = newQueue;
+	vkGetDeviceQueue(m_LogicalDevice, queueFamilyIndex, 0, &newQueue);
+	m_QueueMap[queueFamilyIndex] = newQueue;
 }

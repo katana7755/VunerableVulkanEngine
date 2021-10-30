@@ -67,7 +67,7 @@ bool VulkanGraphicsResourcePipelineCache::CreateInternal()
             printf_console("    Cache contains: 0x%.8x\n", cacheHeaderVersion);
         }
 
-        auto deviceProperties = VulkanGraphicsResourceDevice::GetPhysicalDeviceProperties();
+        auto deviceProperties = VulkanGraphicsResourceDevice::GetInstance().GetPhysicalDeviceProperties();
 
         if (vendorID != deviceProperties.vendorID)
         {
@@ -107,7 +107,7 @@ bool VulkanGraphicsResourcePipelineCache::CreateInternal()
     createInfo.initialDataSize = dataArray.size();
     createInfo.pInitialData = dataArray.data();
 
-    auto result = vkCreatePipelineCache(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &m_PipelineCache);
+    auto result = vkCreatePipelineCache(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &createInfo, NULL, &m_PipelineCache);
 
     if (result)
     {
@@ -122,9 +122,9 @@ bool VulkanGraphicsResourcePipelineCache::DestroyInternal()
 {
     std::vector<uint8_t> dataArray;
     size_t size;
-    vkGetPipelineCacheData(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_PipelineCache, &size, NULL);
+    vkGetPipelineCacheData(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_PipelineCache, &size, NULL);
     dataArray.resize(size);
-    vkGetPipelineCacheData(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_PipelineCache, &size, dataArray.data());
+    vkGetPipelineCacheData(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_PipelineCache, &size, dataArray.data());
 
     FILE* file = fopen(PIPELINE_CACHE_FILE_NAME, "wb");
 

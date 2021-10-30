@@ -25,7 +25,7 @@ bool VulkanGraphicsObjectSampler::CreateInternal()
 	createInfo.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
 	createInfo.unnormalizedCoordinates = VK_FALSE;
 
-	auto result = vkCreateSampler(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &m_Sampler);
+	auto result = vkCreateSampler(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &createInfo, NULL, &m_Sampler);
 
 	if (result)
 	{
@@ -38,7 +38,7 @@ bool VulkanGraphicsObjectSampler::CreateInternal()
 
 bool VulkanGraphicsObjectSampler::DestroyInternal()
 {
-	vkDestroySampler(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_Sampler, NULL);
+	vkDestroySampler(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_Sampler, NULL);
 
 	return true;
 }

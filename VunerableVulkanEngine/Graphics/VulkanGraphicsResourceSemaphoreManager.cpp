@@ -16,7 +16,7 @@ VkSemaphore VulkanGraphicsResourceSemaphoreManager::CreateResourcePhysically(con
 	createInfo.pNext = NULL;
 	createInfo.flags = 0;
 
-	auto result = vkCreateSemaphore(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &outputData);
+	auto result = vkCreateSemaphore(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &createInfo, NULL, &outputData);
 
 	if (result)
 	{
@@ -30,5 +30,5 @@ VkSemaphore VulkanGraphicsResourceSemaphoreManager::CreateResourcePhysically(con
 
 void VulkanGraphicsResourceSemaphoreManager::DestroyResourcePhysicially(const VkSemaphore& outputData)
 {
-	vkDestroySemaphore(VulkanGraphicsResourceDevice::GetLogicalDevice(), outputData, NULL);
+	vkDestroySemaphore(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), outputData, NULL);
 }

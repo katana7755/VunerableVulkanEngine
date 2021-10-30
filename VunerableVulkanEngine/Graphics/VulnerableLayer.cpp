@@ -57,6 +57,8 @@ namespace VulnerableCommand
 	void DestroyCommandBuffer::Execute()
 	{
 		VulkanGraphicsResourceCommandBufferManager::GetInstance().DestroyResource(m_Identifier);
+		VulkanGraphicsResourceCommandBufferManager::GetInstance().ReleaseIdentifier(m_Identifier);
+		m_Identifier = -1;
 	}
 
 	void SubmitAllCommandBuffers::Execute()

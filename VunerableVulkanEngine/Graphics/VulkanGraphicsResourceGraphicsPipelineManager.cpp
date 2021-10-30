@@ -61,7 +61,7 @@ VulkanGraphicsPipelineOutputData VulkanGraphicsResourceGraphicsPipelineManager::
     }
 
 	auto createInfo = GenerateCreateInfo(inputData, pipelineLayout);
-	auto result = vkCreateGraphicsPipelines(VulkanGraphicsResourceDevice::GetLogicalDevice(), VulkanGraphicsResourcePipelineCache::GetInstance().GetPipelineCache(), 1, &createInfo, NULL, &outputData.m_Pipeline);
+	auto result = vkCreateGraphicsPipelines(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), VulkanGraphicsResourcePipelineCache::GetInstance().GetPipelineCache(), 1, &createInfo, NULL, &outputData.m_Pipeline);
 
     if (result)
     {
@@ -75,7 +75,7 @@ VulkanGraphicsPipelineOutputData VulkanGraphicsResourceGraphicsPipelineManager::
 
 void VulkanGraphicsResourceGraphicsPipelineManager::DestroyResourcePhysicially(const VulkanGraphicsPipelineOutputData& outputData)
 {
-    vkDestroyPipeline(VulkanGraphicsResourceDevice::GetLogicalDevice(), outputData.m_Pipeline, NULL);
+    vkDestroyPipeline(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), outputData.m_Pipeline, NULL);
     
     if (outputData.m_PipelineLayoutIdentifier != -1)
     {
@@ -219,7 +219,7 @@ VkGraphicsPipelineCreateInfo VulkanGraphicsResourceGraphicsPipelineManager::Gene
     // Tessellation?
 
     uint32_t swapchainWidth, swapchainHeight;
-    VulkanGraphicsResourceSwapchain::GetSwapchainSize(swapchainWidth, swapchainHeight);
+    VulkanGraphicsResourceSwapchain::GetInstance().GetSwapchainSize(swapchainWidth, swapchainHeight);
 
     static std::vector<VkViewport> viewportArray;
     viewportArray.clear();
@@ -350,7 +350,7 @@ VkGraphicsPipelineCreateInfo VulkanGraphicsResourceGraphicsPipelineManager::Gene
     createInfo.pColorBlendState = &colorBlendState;
     createInfo.pDynamicState = NULL; // &dynamicState;
     createInfo.layout = pipelineLayout;
-    createInfo.renderPass = VulkanGraphicsResourceRenderPassManager::GetRenderPass(inputData.m_RenderPassIndex);
+    createInfo.renderPass = VulkanGraphicsResourceRenderPassManager::GetInstance().GetResource(inputData.m_RenderPassIdentifier);
     createInfo.subpass = inputData.m_SubPassIndex;
     createInfo.basePipelineHandle = VK_NULL_HANDLE; // TODO: in the future we might need to use this for optimization purpose...
     createInfo.basePipelineIndex = -1; // TODO: in the future we might need to use this for optimization purpose...

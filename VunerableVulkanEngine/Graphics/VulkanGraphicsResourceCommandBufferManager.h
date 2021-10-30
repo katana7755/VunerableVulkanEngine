@@ -84,8 +84,8 @@ namespace VulkanGfxExecution
 	// TODO: this should be changed after implementing the render pass manager, frame buffer manager???
 	struct BeginRenderPassExecution : ExecutionBase
 	{
-		int			m_RenderPassIndex;
-		int			m_FramebufferIndex;
+		size_t		m_RenderPassIdentifier;
+		size_t		m_FrameBufferIdentifier;
 		VkImage		m_FrameBufferColor;
 		VkImage		m_FrameBufferDepth;
 		VkRect2D	m_RenderArea;

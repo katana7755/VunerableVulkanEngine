@@ -22,7 +22,7 @@ VkShaderModule VulkanGraphicsResourceShaderManager::CreateResourcePhysically(con
     createInfo.pCode = reinterpret_cast<const uint32_t*>(inputData.m_Data);
 
     auto shaderModule = VkShaderModule();
-    auto result = vkCreateShaderModule(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &shaderModule);
+    auto result = vkCreateShaderModule(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &createInfo, NULL, &shaderModule);
 
     if (result)
     {
@@ -36,5 +36,5 @@ VkShaderModule VulkanGraphicsResourceShaderManager::CreateResourcePhysically(con
 
 void VulkanGraphicsResourceShaderManager::DestroyResourcePhysicially(const VkShaderModule& shaderModule)
 {
-    vkDestroyShaderModule(VulkanGraphicsResourceDevice::GetLogicalDevice(), shaderModule, NULL);
+    vkDestroyShaderModule(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), shaderModule, NULL);
 }

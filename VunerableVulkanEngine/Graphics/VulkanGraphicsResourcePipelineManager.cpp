@@ -41,7 +41,7 @@ int VulkanGraphicsResourcePipelineManager::CreateGfxFence()
     createInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
     auto fence = VkFence();
-    auto result = vkCreateFence(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &fence);
+    auto result = vkCreateFence(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &createInfo, NULL, &fence);
 
     if (result)
     {
@@ -62,7 +62,7 @@ const VkFence& VulkanGraphicsResourcePipelineManager::GetGfxFence(int index)
 
 void VulkanGraphicsResourcePipelineManager::DestroyGfxFence(int index)
 {
-    vkDestroyFence(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_GfxFenceArray[index], NULL);
+    vkDestroyFence(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), s_GfxFenceArray[index], NULL);
     s_GfxFenceArray.erase(s_GfxFenceArray.begin() + index);
 }
 
@@ -74,7 +74,7 @@ int VulkanGraphicsResourcePipelineManager::CreateGfxSemaphore()
     createInfo.flags = 0;
 
     auto semaphore = VkSemaphore();
-    auto result = vkCreateSemaphore(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &semaphore);
+    auto result = vkCreateSemaphore(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &createInfo, NULL, &semaphore);
 
     if (result)
     {
@@ -95,7 +95,7 @@ const VkSemaphore& VulkanGraphicsResourcePipelineManager::GetGfxSemaphore(int in
 
 void VulkanGraphicsResourcePipelineManager::DestroyGfxSemaphore(int index)
 {
-    vkDestroySemaphore(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_GfxSemaphoreArray[index], NULL);
+    vkDestroySemaphore(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), s_GfxSemaphoreArray[index], NULL);
     s_GfxSemaphoreArray.erase(s_GfxSemaphoreArray.begin() + index);
 }
 
@@ -131,7 +131,7 @@ int VulkanGraphicsResourcePipelineManager::CreateDescriptorSetLayout()
     createInfo.pBindings = descSetLayoutBindingArray.data();
 
     auto descSetLayout = VkDescriptorSetLayout();
-    auto result = vkCreateDescriptorSetLayout(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &descSetLayout);
+    auto result = vkCreateDescriptorSetLayout(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &createInfo, NULL, &descSetLayout);
 
     if (result)
     {
@@ -147,7 +147,7 @@ int VulkanGraphicsResourcePipelineManager::CreateDescriptorSetLayout()
 
 void VulkanGraphicsResourcePipelineManager::DestroyDescriptorSetLayout(int index)
 {
-    vkDestroyDescriptorSetLayout(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_DescriptorSetLayoutArray[index], NULL);
+    vkDestroyDescriptorSetLayout(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), s_DescriptorSetLayoutArray[index], NULL);
     s_DescriptorSetLayoutArray.erase(s_DescriptorSetLayoutArray.begin() + index);
 }
 
@@ -193,7 +193,7 @@ int VulkanGraphicsResourcePipelineManager::CreatePipelineLayout(std::vector<int>
     createInfo.pPushConstantRanges = pushConstantRangeArray.data();
 
     auto pipelineLayout = VkPipelineLayout();
-    auto result = vkCreatePipelineLayout(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &pipelineLayout);
+    auto result = vkCreatePipelineLayout(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &createInfo, NULL, &pipelineLayout);
 
     if (result)
     {
@@ -214,7 +214,7 @@ const VkPipelineLayout& VulkanGraphicsResourcePipelineManager::GetPipelineLayout
 
 void VulkanGraphicsResourcePipelineManager::DestroyPipelineLayout(int index)
 {
-    vkDestroyPipelineLayout(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_PipelineLayoutArray[index], NULL);
+    vkDestroyPipelineLayout(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), s_PipelineLayoutArray[index], NULL);
     s_PipelineLayoutArray.erase(s_PipelineLayoutArray.begin() + index);
 }
 
@@ -223,248 +223,12 @@ void VulkanGraphicsResourcePipelineManager::BeginToCreateGraphicsPipeline()
     s_GraphicsPipelineCreateInfoArray.clear();
 }
 
-int VulkanGraphicsResourcePipelineManager::CreateGraphicsPipeline(const size_t vertexShaderIdentifier, const size_t fragmentShaderIdentifier, int pipelineLayoutIndex, int renderPassIndex, int subPassIndex)
-//int VulkanGraphicsResourcePipelineManager::CreateGraphicsPipeline(int vertexShaderModuleIndex, int fragmentShaderModuleIndex, int pipelineLayoutIndex, int renderPassIndex, int subPassIndex)
-{
-    VkResult result;
-
-    static std::vector<VkPipelineShaderStageCreateInfo> shaderStageCreateInfoArray;
-    shaderStageCreateInfoArray.clear();
-    {
-        auto stageCreateInfo = VkPipelineShaderStageCreateInfo();
-        stageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        stageCreateInfo.pNext = NULL;
-        stageCreateInfo.flags = 0;
-        stageCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-        stageCreateInfo.module = VulkanGraphicsResourceShaderManager::GetInstance().GetResource(vertexShaderIdentifier);
-        stageCreateInfo.pName = "main";
-        stageCreateInfo.pSpecializationInfo = NULL; // TODO: find out what this is for...
-        shaderStageCreateInfoArray.push_back(stageCreateInfo);
-    }
-    {
-        auto stageCreateInfo = VkPipelineShaderStageCreateInfo();
-        stageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        stageCreateInfo.pNext = NULL;
-        stageCreateInfo.flags = 0;
-        stageCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-        stageCreateInfo.module = VulkanGraphicsResourceShaderManager::GetInstance().GetResource(fragmentShaderIdentifier);
-        stageCreateInfo.pName = "main";
-        stageCreateInfo.pSpecializationInfo = NULL; // TODO: find out what this is for...
-        shaderStageCreateInfoArray.push_back(stageCreateInfo);
-    }
-
-    // TODO: need to support multiple vertex buffers...(NECESSARY!!!)
-    static std::vector<VkVertexInputBindingDescription> vertexInputBindingDescArray;
-    vertexInputBindingDescArray.clear();
-    {
-        auto bindingDesc = VkVertexInputBindingDescription();
-        bindingDesc.binding = 0;
-        bindingDesc.stride = sizeof(VertexData);
-        bindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-        vertexInputBindingDescArray.push_back(bindingDesc);
-    }
-
-    // TODO: need to support more various vertex channel like a vertex color...(NECESSARY!!!)
-    static std::vector<VkVertexInputAttributeDescription> vertexInputAttributeDescArray;
-    vertexInputAttributeDescArray.clear();
-    {
-        auto attributeDesc = VkVertexInputAttributeDescription();
-        attributeDesc.location = 0;
-        attributeDesc.binding = 0;
-        attributeDesc.format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDesc.offset = offsetof(VertexData, m_Position);
-        vertexInputAttributeDescArray.push_back(attributeDesc);
-    }
-    {
-        auto attributeDesc = VkVertexInputAttributeDescription();
-        attributeDesc.location = 1;
-        attributeDesc.binding = 0;
-        attributeDesc.format = VK_FORMAT_R32G32_SFLOAT;
-        attributeDesc.offset = offsetof(VertexData, m_UV);
-        vertexInputAttributeDescArray.push_back(attributeDesc);
-    }
-    {
-        auto attributeDesc = VkVertexInputAttributeDescription();
-        attributeDesc.location = 2;
-        attributeDesc.binding = 0;
-        attributeDesc.format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDesc.offset = offsetof(VertexData, m_Normal);
-        vertexInputAttributeDescArray.push_back(attributeDesc);
-    }
-    {
-        auto attributeDesc = VkVertexInputAttributeDescription();
-        attributeDesc.location = 3;
-        attributeDesc.binding = 0;
-        attributeDesc.format = VK_FORMAT_R32_SFLOAT;
-        attributeDesc.offset = offsetof(VertexData, m_Material);
-        vertexInputAttributeDescArray.push_back(attributeDesc);
-    }
-
-    static auto vertexInputStateCreateInfo = VkPipelineVertexInputStateCreateInfo();
-    vertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputStateCreateInfo.pNext = NULL;
-    vertexInputStateCreateInfo.flags = 0;
-    vertexInputStateCreateInfo.vertexBindingDescriptionCount = vertexInputBindingDescArray.size();
-    vertexInputStateCreateInfo.pVertexBindingDescriptions = vertexInputBindingDescArray.data();
-    vertexInputStateCreateInfo.vertexAttributeDescriptionCount = vertexInputAttributeDescArray.size();
-    vertexInputStateCreateInfo.pVertexAttributeDescriptions = vertexInputAttributeDescArray.data();
-
-    static auto inputAssemblyState = VkPipelineInputAssemblyStateCreateInfo();
-    inputAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssemblyState.pNext = NULL;
-    inputAssemblyState.flags = 0;
-    inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST; // TODO: need to support other types of topology...
-    inputAssemblyState.primitiveRestartEnable = VK_FALSE; // TODO: find out when this is needed...
-
-    // Tessellation?
-
-    uint32_t swapchainWidth, swapchainHeight;
-    VulkanGraphicsResourceSwapchain::GetSwapchainSize(swapchainWidth, swapchainHeight);
-
-    static std::vector<VkViewport> viewportArray;
-    viewportArray.clear();
-    {
-        auto viewport = VkViewport();
-        viewport.x = 0.0f;
-        viewport.y = 0.0f;
-        viewport.width = swapchainWidth;
-        viewport.height = swapchainHeight;
-        viewport.minDepth = 0.0f;
-        viewport.maxDepth = 1.0f;
-        viewportArray.push_back(viewport);
-    }
-
-    static std::vector<VkRect2D> scissorArray;
-    scissorArray.clear();
-    {
-        auto scissor = VkRect2D();
-        scissor.offset = { 0, 0 };
-        scissor.extent = { swapchainWidth, swapchainHeight };
-        scissorArray.push_back(scissor);
-    }
-
-    static auto viewportState = VkPipelineViewportStateCreateInfo();
-    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportState.pNext = NULL;
-    viewportState.flags = 0;
-    viewportState.viewportCount = viewportArray.size(); // TODO: it might be needed when starting to consider VR...
-    viewportState.pViewports = viewportArray.data();
-    viewportState.scissorCount = scissorArray.size(); // TODO: it might be needed when starting to consider VR...
-    viewportState.pScissors = scissorArray.data();
-
-    static auto rasterizationState = VkPipelineRasterizationStateCreateInfo();
-    rasterizationState.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizationState.pNext = NULL;
-    rasterizationState.flags = 0;
-    rasterizationState.depthClampEnable = VK_FALSE;
-    rasterizationState.rasterizerDiscardEnable = VK_FALSE; // TODO: this seems to be used when there is no Geometry Shader and Tessellation...
-    rasterizationState.polygonMode = VK_POLYGON_MODE_FILL; // TODO: there are additional modes, one of these is drawing in wire frame mode...
-    rasterizationState.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizationState.frontFace = VK_FRONT_FACE_CLOCKWISE;
-    rasterizationState.depthBiasEnable = VK_FALSE; // TODO: this will be used in shadow and decal rendering
-    rasterizationState.depthBiasConstantFactor = 0.0f;
-    rasterizationState.depthBiasClamp = 0.0f;
-    rasterizationState.depthBiasSlopeFactor = 0.0f;
-    rasterizationState.lineWidth = 1.0f;
-
-    static auto multisampleState = VkPipelineMultisampleStateCreateInfo();
-    multisampleState.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampleState.pNext = NULL;
-    multisampleState.flags = 0;
-    multisampleState.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT; // TODO: consider MSAA in the future(NECESSARY!!!)...
-    multisampleState.sampleShadingEnable = VK_FALSE; // TODO: let's figure out what this is...
-    multisampleState.minSampleShading = 1.0f;
-    multisampleState.pSampleMask = NULL;
-    multisampleState.alphaToCoverageEnable = VK_FALSE;
-    multisampleState.alphaToOneEnable = VK_FALSE;
-
-    static auto depthStencilState = VkPipelineDepthStencilStateCreateInfo();
-    depthStencilState.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencilState.pNext = NULL;
-    depthStencilState.flags = 0;
-    depthStencilState.depthTestEnable = VK_TRUE;
-    depthStencilState.depthWriteEnable = VK_TRUE;
-    depthStencilState.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-    depthStencilState.depthBoundsTestEnable = VK_FALSE; // TODO: let's find out use-cases of this functionality
-    depthStencilState.stencilTestEnable = VK_FALSE; // TODO: leave it until we need to use stencil test...
-    depthStencilState.front = VkStencilOpState{}; 
-    depthStencilState.back = VkStencilOpState{};
-    depthStencilState.minDepthBounds = 0.0f;
-    depthStencilState.maxDepthBounds = 1.0f;
-
-    // TODO: we should seperate transparent from opaque. for now we consider all objects are oppaque. (NECESSARY!!!)
-    static std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachmentStateArray;
-    colorBlendAttachmentStateArray.clear();
-    {
-        auto attachmentState = VkPipelineColorBlendAttachmentState();
-        attachmentState.blendEnable = VK_FALSE;
-        attachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_ZERO;
-        attachmentState.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
-        attachmentState.colorBlendOp = VK_BLEND_OP_ADD;
-        attachmentState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-        attachmentState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-        attachmentState.alphaBlendOp = VK_BLEND_OP_ADD;
-        attachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-        colorBlendAttachmentStateArray.push_back(attachmentState);
-    }
-
-    static auto colorBlendState = VkPipelineColorBlendStateCreateInfo();
-    colorBlendState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlendState.pNext = NULL;
-    colorBlendState.flags = 0;
-    colorBlendState.logicOpEnable = VK_FALSE; // TODO: what can be proper use-cases for this functionalty...
-    colorBlendState.logicOp = VK_LOGIC_OP_CLEAR;
-    colorBlendState.attachmentCount = colorBlendAttachmentStateArray.size();
-    colorBlendState.pAttachments = colorBlendAttachmentStateArray.data();
-    colorBlendState.blendConstants[0] = 0.0f;
-    colorBlendState.blendConstants[1] = 0.0f;
-    colorBlendState.blendConstants[2] = 0.0f;
-    colorBlendState.blendConstants[3] = 0.0f;
-
-    static std::vector<VkDynamicState> dynamicStateArray;
-    dynamicStateArray.clear();
-    {
-        // TODO: there are bunch of useful states for example viewport, scissor, vertex input binding stride and etc....(NECESSARY!!!)
-    }
-
-    static auto dynamicState = VkPipelineDynamicStateCreateInfo();
-    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    dynamicState.pNext = NULL;
-    dynamicState.flags = 0;
-    dynamicState.dynamicStateCount = dynamicStateArray.size();
-    dynamicState.pDynamicStates = dynamicStateArray.data();
-
-    static auto createInfo = VkGraphicsPipelineCreateInfo();
-    createInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    createInfo.pNext = NULL;
-    createInfo.flags = 0; // TODO: check out other options...
-    createInfo.stageCount = shaderStageCreateInfoArray.size();
-    createInfo.pStages = shaderStageCreateInfoArray.data();
-    createInfo.pVertexInputState = &vertexInputStateCreateInfo;
-    createInfo.pInputAssemblyState = &inputAssemblyState;
-    createInfo.pTessellationState = NULL; // TODO: we need this in the future...
-    createInfo.pViewportState = &viewportState;
-    createInfo.pRasterizationState = &rasterizationState;
-    createInfo.pMultisampleState = &multisampleState;
-    createInfo.pDepthStencilState = &depthStencilState;
-    createInfo.pColorBlendState = &colorBlendState;
-    createInfo.pDynamicState = NULL; // &dynamicState;
-    createInfo.layout = s_PipelineLayoutArray[pipelineLayoutIndex];
-    createInfo.renderPass = VulkanGraphicsResourceRenderPassManager::GetRenderPass(renderPassIndex);
-    createInfo.subpass = (uint32_t)subPassIndex;
-    createInfo.basePipelineHandle = VK_NULL_HANDLE; // TODO: in the future we might need to use this for optimization purpose...
-    createInfo.basePipelineIndex = -1; // TODO: in the future we might need to use this for optimization purpose...
-    s_GraphicsPipelineCreateInfoArray.push_back(createInfo);
-
-    return s_GraphicsPipelineArray.size() + s_GraphicsPipelineCreateInfoArray.size() - 1;
-}
-
 void VulkanGraphicsResourcePipelineManager::EndToCreateGraphicsPipeline()
 {
     int offset = s_GraphicsPipelineArray.size();
     s_GraphicsPipelineArray.resize(s_GraphicsPipelineArray.size() + s_GraphicsPipelineCreateInfoArray.size());
     
-    auto result = vkCreateGraphicsPipelines(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_PipelineCache, s_GraphicsPipelineCreateInfoArray.size(), s_GraphicsPipelineCreateInfoArray.data(), NULL, s_GraphicsPipelineArray.data() + offset);
+    auto result = vkCreateGraphicsPipelines(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), s_PipelineCache, s_GraphicsPipelineCreateInfoArray.size(), s_GraphicsPipelineCreateInfoArray.data(), NULL, s_GraphicsPipelineArray.data() + offset);
 
     if (result)
     {
@@ -483,7 +247,7 @@ const VkPipeline& VulkanGraphicsResourcePipelineManager::GetGraphicsPipeline(int
 
 void VulkanGraphicsResourcePipelineManager::DestroyGraphicsPipeline(int index)
 {
-    vkDestroyPipeline(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_GraphicsPipelineArray[index], NULL);
+    vkDestroyPipeline(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), s_GraphicsPipelineArray[index], NULL);
     s_GraphicsPipelineArray.erase(s_GraphicsPipelineArray.begin() + index);
 }
 
@@ -499,7 +263,7 @@ int VulkanGraphicsResourcePipelineManager::CreateDescriptorPool(const std::vecto
     createInfo.pPoolSizes = poolSizeArray.data();
 
     auto descriptorPool = VkDescriptorPool();
-    auto result = vkCreateDescriptorPool(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &descriptorPool);
+    auto result = vkCreateDescriptorPool(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &createInfo, NULL, &descriptorPool);
 
     if (result)
     {
@@ -515,7 +279,7 @@ int VulkanGraphicsResourcePipelineManager::CreateDescriptorPool(const std::vecto
 
 void VulkanGraphicsResourcePipelineManager::DestroyDescriptorPool(int index)
 {
-    vkDestroyDescriptorPool(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_DescriptorPoolArray[index], NULL);
+    vkDestroyDescriptorPool(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), s_DescriptorPoolArray[index], NULL);
     s_DescriptorPoolArray.erase(s_DescriptorPoolArray.begin() + index);
 }
 
@@ -530,7 +294,7 @@ int VulkanGraphicsResourcePipelineManager::AllocateDescriptorSet(int poolIndex, 
     allocateInfo.pSetLayouts = &descriptorSetLayout;
 
     auto descriptorSet = VkDescriptorSet();
-    auto result = vkAllocateDescriptorSets(VulkanGraphicsResourceDevice::GetLogicalDevice(), &allocateInfo, &descriptorSet);
+    auto result = vkAllocateDescriptorSets(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &allocateInfo, &descriptorSet);
 
     if (result)
     {
@@ -567,13 +331,13 @@ void VulkanGraphicsResourcePipelineManager::UpdateDescriptorSet(int index, int b
         writeSetArray.push_back(writeSet);
     }
 
-    vkUpdateDescriptorSets(VulkanGraphicsResourceDevice::GetLogicalDevice(), 1, writeSetArray.data(), 0, NULL);
+    vkUpdateDescriptorSets(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), 1, writeSetArray.data(), 0, NULL);
 }
 
 void VulkanGraphicsResourcePipelineManager::ReleaseDescriptorSet(int index)
 {
     int poolIndex = s_DescriptorPoolIndexArray[index];
-    vkFreeDescriptorSets(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_DescriptorPoolArray[poolIndex], 1, &s_DescriptorSetArray[index]);
+    vkFreeDescriptorSets(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), s_DescriptorPoolArray[poolIndex], 1, &s_DescriptorSetArray[index]);
     s_DescriptorPoolIndexArray.erase(s_DescriptorPoolIndexArray.begin() + index);
     s_DescriptorSetArray.erase(s_DescriptorSetArray.begin() + index);
 }
@@ -638,7 +402,7 @@ bool VulkanGraphicsResourcePipelineManager::CreateInternal()
             printf_console("    Cache contains: 0x%.8x\n", cacheHeaderVersion);
         }
 
-        auto deviceProperties = VulkanGraphicsResourceDevice::GetPhysicalDeviceProperties();
+        auto deviceProperties = VulkanGraphicsResourceDevice::GetInstance().GetPhysicalDeviceProperties();
 
         if (vendorID != deviceProperties.vendorID) 
         {
@@ -678,7 +442,7 @@ bool VulkanGraphicsResourcePipelineManager::CreateInternal()
     createInfo.initialDataSize = dataArray.size();
     createInfo.pInitialData = dataArray.data();
 
-	auto result = vkCreatePipelineCache(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &s_PipelineCache);
+	auto result = vkCreatePipelineCache(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &createInfo, NULL, &s_PipelineCache);
 
     if (result)
     {
@@ -686,7 +450,7 @@ bool VulkanGraphicsResourcePipelineManager::CreateInternal()
         throw;
     }
 
-	//vkCreateGraphicsPipelines(VulkanGraphicsResourceDevice::GetLogicalDevice(), /*cache*/, /*count*/, /*pInfos*/, NULL, /*pPipeline*/);
+	//vkCreateGraphicsPipelines(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), /*cache*/, /*count*/, /*pInfos*/, NULL, /*pPipeline*/);
 
 	return true;
 }
@@ -695,9 +459,9 @@ bool VulkanGraphicsResourcePipelineManager::DestroyInternal()
 {
     std::vector<uint8_t> dataArray;
     size_t size;
-    vkGetPipelineCacheData(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_PipelineCache, &size, NULL);
+    vkGetPipelineCacheData(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), s_PipelineCache, &size, NULL);
     dataArray.resize(size);
-    vkGetPipelineCacheData(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_PipelineCache, &size, dataArray.data());
+    vkGetPipelineCacheData(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), s_PipelineCache, &size, dataArray.data());
 
     FILE* file = fopen(PIPELINE_CACHE_DATA_FILE_NAME, "wb");
 
@@ -713,28 +477,28 @@ bool VulkanGraphicsResourcePipelineManager::DestroyInternal()
 
     for (auto descPool : s_DescriptorPoolArray)
     {
-        vkDestroyDescriptorPool(VulkanGraphicsResourceDevice::GetLogicalDevice(), descPool, NULL);
+        vkDestroyDescriptorPool(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), descPool, NULL);
     }
 
     s_DescriptorPoolArray.clear();
 
     for (auto pipeline : s_GraphicsPipelineArray)
     {
-        vkDestroyPipeline(VulkanGraphicsResourceDevice::GetLogicalDevice(), pipeline, NULL);
+        vkDestroyPipeline(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), pipeline, NULL);
     }
 
     s_GraphicsPipelineArray.clear();
 
     for (auto descSetLayout : s_DescriptorSetLayoutArray)
     {
-        vkDestroyDescriptorSetLayout(VulkanGraphicsResourceDevice::GetLogicalDevice(), descSetLayout, NULL);
+        vkDestroyDescriptorSetLayout(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), descSetLayout, NULL);
     }
 
     s_DescriptorSetLayoutArray.clear();
 
     for (auto pipelineLayout : s_PipelineLayoutArray)
     {
-        vkDestroyPipelineLayout(VulkanGraphicsResourceDevice::GetLogicalDevice(), pipelineLayout, NULL);
+        vkDestroyPipelineLayout(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), pipelineLayout, NULL);
     }
 
     s_PipelineLayoutArray.clear();
@@ -742,18 +506,18 @@ bool VulkanGraphicsResourcePipelineManager::DestroyInternal()
 
     for (auto semaphore : s_GfxSemaphoreArray)
     {
-        vkDestroySemaphore(VulkanGraphicsResourceDevice::GetLogicalDevice(), semaphore, NULL);
+        vkDestroySemaphore(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), semaphore, NULL);
     }
 
     s_GfxSemaphoreArray.clear();
 
     for (auto fence : s_GfxFenceArray)
     {
-        vkDestroyFence(VulkanGraphicsResourceDevice::GetLogicalDevice(), fence, NULL);
+        vkDestroyFence(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), fence, NULL);
     }
 
     s_GfxFenceArray.clear();
-    vkDestroyPipelineCache(VulkanGraphicsResourceDevice::GetLogicalDevice(), s_PipelineCache, NULL);
+    vkDestroyPipelineCache(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), s_PipelineCache, NULL);
 
 	return true;
 }

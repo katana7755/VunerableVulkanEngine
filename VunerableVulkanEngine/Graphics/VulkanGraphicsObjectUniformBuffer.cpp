@@ -26,7 +26,7 @@ bool VulkanGraphicsObjectUniformBuffer::CreateInternal()
 	createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	createInfo.flags = 0;
 	
-	auto result = vkCreateBuffer(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &m_Buffer);
+	auto result = vkCreateBuffer(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &createInfo, NULL, &m_Buffer);
 
 	if (result)
 	{
@@ -35,20 +35,20 @@ bool VulkanGraphicsObjectUniformBuffer::CreateInternal()
 	}
 
 	auto requirements = VkMemoryRequirements();
-	vkGetBufferMemoryRequirements(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_Buffer, &requirements);
+	vkGetBufferMemoryRequirements(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_Buffer, &requirements);
 
 	auto allocationInfo = VkMemoryAllocateInfo();
 	allocationInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	allocationInfo.pNext = NULL;
 
-	if (!VulkanGraphicsResourceDevice::GetMemoryTypeIndex(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &allocationInfo.memoryTypeIndex))
+	if (!VulkanGraphicsResourceDevice::GetInstance().GetMemoryTypeIndex(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &allocationInfo.memoryTypeIndex))
 	{
 		printf_console("[VulkanGraphics] cannot find memoryTypeIndex matching VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT\n");
 		return false;
 	}
 
 	allocationInfo.allocationSize = requirements.size;
-	result = vkAllocateMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), &allocationInfo, NULL, &m_DeviceMemory);
+	result = vkAllocateMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &allocationInfo, NULL, &m_DeviceMemory);
 
 	if (result)
 	{
@@ -59,7 +59,7 @@ bool VulkanGraphicsObjectUniformBuffer::CreateInternal()
 	m_IsDeviceMemoryAllocated = true;
 
 	uint8_t* pData;
-	result = vkMapMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_DeviceMemory, 0, requirements.size, 0, (void**)&pData);
+	result = vkMapMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_DeviceMemory, 0, requirements.size, 0, (void**)&pData);
 
 	if (result)
 	{
@@ -69,8 +69,8 @@ bool VulkanGraphicsObjectUniformBuffer::CreateInternal()
 
 	m_BufferSize = sizeof(MVPMatrix);
 	memcpy(pData, &MVPMatrix, m_BufferSize);
-	vkUnmapMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_DeviceMemory);
-	result = vkBindBufferMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_Buffer, m_DeviceMemory, 0);
+	vkUnmapMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_DeviceMemory);
+	result = vkBindBufferMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_Buffer, m_DeviceMemory, 0);
 
 	if (result)
 	{
@@ -91,10 +91,10 @@ bool VulkanGraphicsObjectUniformBuffer::DestroyInternal()
 
 	if (m_IsDeviceMemoryAllocated)
 	{
-		vkFreeMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_DeviceMemory, NULL);
+		vkFreeMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_DeviceMemory, NULL);
 		m_IsDeviceMemoryAllocated = false;
 	}
 
-	vkDestroyBuffer(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_Buffer, NULL);
+	vkDestroyBuffer(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_Buffer, NULL);
 	return true;
 }

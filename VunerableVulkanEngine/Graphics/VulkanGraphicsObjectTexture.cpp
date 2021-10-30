@@ -7,9 +7,9 @@
 
 void VulkanGraphicsObjectTexture::CreateAsColorBuffer()
 {
-	m_Format = VulkanGraphicsResourceDevice::GetSurfaceFormatArray()[0].format;
-	m_Width = VulkanGraphicsResourceDevice::GetSurfaceCapabilities().currentExtent.width;
-	m_Height = VulkanGraphicsResourceDevice::GetSurfaceCapabilities().currentExtent.height;
+	m_Format = VulkanGraphicsResourceDevice::GetInstance().GetSurfaceFormatArray()[0].format;
+	m_Width = VulkanGraphicsResourceDevice::GetInstance().GetSurfaceCapabilities().currentExtent.width;
+	m_Height = VulkanGraphicsResourceDevice::GetInstance().GetSurfaceCapabilities().currentExtent.height;
 	m_MipLevel = 1;
 	m_SampleCountBits = VK_SAMPLE_COUNT_1_BIT;
 	m_Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -20,8 +20,8 @@ void VulkanGraphicsObjectTexture::CreateAsColorBuffer()
 void VulkanGraphicsObjectTexture::CreateAsDepthBuffer()
 {
 	m_Format = VK_FORMAT_D32_SFLOAT;
-	m_Width = VulkanGraphicsResourceDevice::GetSurfaceCapabilities().currentExtent.width;
-	m_Height = VulkanGraphicsResourceDevice::GetSurfaceCapabilities().currentExtent.height;
+	m_Width = VulkanGraphicsResourceDevice::GetInstance().GetSurfaceCapabilities().currentExtent.width;
+	m_Height = VulkanGraphicsResourceDevice::GetInstance().GetSurfaceCapabilities().currentExtent.height;
 	m_MipLevel = 1;
 	m_SampleCountBits = VK_SAMPLE_COUNT_1_BIT;
 	m_Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
@@ -31,9 +31,9 @@ void VulkanGraphicsObjectTexture::CreateAsDepthBuffer()
 
 void VulkanGraphicsObjectTexture::CreateAsColorBufferForGUI()
 {
-	m_Format = VulkanGraphicsResourceDevice::GetSurfaceFormatArray()[0].format;
-	m_Width = VulkanGraphicsResourceDevice::GetSurfaceCapabilities().currentExtent.width;
-	m_Height = VulkanGraphicsResourceDevice::GetSurfaceCapabilities().currentExtent.height;
+	m_Format = VulkanGraphicsResourceDevice::GetInstance().GetSurfaceFormatArray()[0].format;
+	m_Width = VulkanGraphicsResourceDevice::GetInstance().GetSurfaceCapabilities().currentExtent.width;
+	m_Height = VulkanGraphicsResourceDevice::GetInstance().GetSurfaceCapabilities().currentExtent.height;
 	m_MipLevel = 1;
 	m_SampleCountBits = VK_SAMPLE_COUNT_1_BIT;
 	m_Usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -130,13 +130,13 @@ void VulkanGraphicsObjectTexture::TryToClearStagingBuffer()
 {
 	if (m_StagingMemory != VK_NULL_HANDLE)
 	{
-		vkFreeMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_StagingMemory, NULL);
+		vkFreeMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_StagingMemory, NULL);
 		m_StagingMemory = VK_NULL_HANDLE;
 	}
 	
 	if (m_StagingBuffer != VK_NULL_HANDLE)
 	{
-		vkDestroyBuffer(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_StagingBuffer, NULL);
+		vkDestroyBuffer(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_StagingBuffer, NULL);
 		m_StagingBuffer = VK_NULL_HANDLE;
 	}
 }
@@ -153,7 +153,7 @@ void VulkanGraphicsObjectTexture::CreateStagingBuffer(unsigned char* pixelData, 
 	createInfo.queueFamilyIndexCount = 0;
 	createInfo.pQueueFamilyIndices = NULL;
 
-	auto result = vkCreateBuffer(VulkanGraphicsResourceDevice::GetLogicalDevice(), &createInfo, NULL, &m_StagingBuffer);
+	auto result = vkCreateBuffer(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &createInfo, NULL, &m_StagingBuffer);
 
 	if (result)
 	{
@@ -163,13 +163,13 @@ void VulkanGraphicsObjectTexture::CreateStagingBuffer(unsigned char* pixelData, 
 	}
 
 	auto requirements = VkMemoryRequirements();
-	vkGetBufferMemoryRequirements(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_StagingBuffer, &requirements);
+	vkGetBufferMemoryRequirements(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_StagingBuffer, &requirements);
 
 	auto allocationInfo = VkMemoryAllocateInfo();
 	allocationInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	allocationInfo.pNext = NULL;
 
-	if (!VulkanGraphicsResourceDevice::GetMemoryTypeIndex(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &allocationInfo.memoryTypeIndex))
+	if (!VulkanGraphicsResourceDevice::GetInstance().GetMemoryTypeIndex(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &allocationInfo.memoryTypeIndex))
 	{
 		printf_console("[VulkanGraphics] cannot find memoryTypeIndex matching VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT\n");
 
@@ -179,7 +179,7 @@ void VulkanGraphicsObjectTexture::CreateStagingBuffer(unsigned char* pixelData, 
 	allocationInfo.allocationSize = requirements.size;
 
 	// TODO: find out which one is better between one big memory and seperate small allocation...
-	result = vkAllocateMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), &allocationInfo, NULL, &m_StagingMemory);
+	result = vkAllocateMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &allocationInfo, NULL, &m_StagingMemory);
 
 	if (result)
 	{
@@ -188,7 +188,7 @@ void VulkanGraphicsObjectTexture::CreateStagingBuffer(unsigned char* pixelData, 
 		throw;
 	}
 
-	result = vkBindBufferMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_StagingBuffer, m_StagingMemory, 0);
+	result = vkBindBufferMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_StagingBuffer, m_StagingMemory, 0);
 
 	if (result)
 	{
@@ -198,7 +198,7 @@ void VulkanGraphicsObjectTexture::CreateStagingBuffer(unsigned char* pixelData, 
 	}
 
 	void* data;
-	result = vkMapMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_StagingMemory, 0, imageSize, 0, &data);
+	result = vkMapMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_StagingMemory, 0, imageSize, 0, &data);
 
 	if (result)
 	{
@@ -208,7 +208,7 @@ void VulkanGraphicsObjectTexture::CreateStagingBuffer(unsigned char* pixelData, 
 	}
 
 	memcpy(data, pixelData, imageSize);
-	vkUnmapMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_StagingMemory);
+	vkUnmapMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_StagingMemory);
 	m_IsStagingBufferExist = true;
 }
 
@@ -233,7 +233,7 @@ bool VulkanGraphicsObjectTexture::CreateInternal()
 	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	imageCreateInfo.flags = 0;
 
-	auto result = vkCreateImage(VulkanGraphicsResourceDevice::GetLogicalDevice(), &imageCreateInfo, NULL, &m_Image);
+	auto result = vkCreateImage(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &imageCreateInfo, NULL, &m_Image);
 
 	if (result)
 	{
@@ -243,13 +243,13 @@ bool VulkanGraphicsObjectTexture::CreateInternal()
 	}
 
 	auto requirements = VkMemoryRequirements();
-	vkGetImageMemoryRequirements(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_Image, &requirements);
+	vkGetImageMemoryRequirements(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_Image, &requirements);
 
 	auto allocationInfo = VkMemoryAllocateInfo();
 	allocationInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	allocationInfo.pNext = NULL;
 	
-	if (!VulkanGraphicsResourceDevice::GetMemoryTypeIndex(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &allocationInfo.memoryTypeIndex))
+	if (!VulkanGraphicsResourceDevice::GetInstance().GetMemoryTypeIndex(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &allocationInfo.memoryTypeIndex))
 	{
 		printf_console("[VulkanGraphics] cannot find memoryTypeIndex matching VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT\n");
 		
@@ -259,7 +259,7 @@ bool VulkanGraphicsObjectTexture::CreateInternal()
 	allocationInfo.allocationSize = requirements.size;
 
 	// TODO: find out which one is better between one big memory and seperate small allocation...
-	result = vkAllocateMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), &allocationInfo, NULL, &m_ImageMemory);
+	result = vkAllocateMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &allocationInfo, NULL, &m_ImageMemory);
 
 	if (result)
 	{
@@ -268,7 +268,7 @@ bool VulkanGraphicsObjectTexture::CreateInternal()
 		throw;
 	}
 
-	result = vkBindImageMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_Image, m_ImageMemory, 0);
+	result = vkBindImageMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_Image, m_ImageMemory, 0);
 
 	if (result)
 	{
@@ -293,7 +293,7 @@ bool VulkanGraphicsObjectTexture::CreateInternal()
 	imageViewCreateInfo.subresourceRange.layerCount = 1;
 	imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	imageViewCreateInfo.flags = 0;
-	result = vkCreateImageView(VulkanGraphicsResourceDevice::GetLogicalDevice(), &imageViewCreateInfo, NULL, &m_ImageView);
+	result = vkCreateImageView(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &imageViewCreateInfo, NULL, &m_ImageView);
 
 	if (result)
 	{
@@ -308,9 +308,9 @@ bool VulkanGraphicsObjectTexture::CreateInternal()
 bool VulkanGraphicsObjectTexture::DestroyInternal()
 {
 	TryToClearStagingBuffer();
-	vkDestroyImageView(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_ImageView, NULL);
-	vkFreeMemory(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_ImageMemory, NULL);
-	vkDestroyImage(VulkanGraphicsResourceDevice::GetLogicalDevice(), m_Image, NULL);
+	vkDestroyImageView(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_ImageView, NULL);
+	vkFreeMemory(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_ImageMemory, NULL);
+	vkDestroyImage(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_Image, NULL);
 
 	return true;
 }

@@ -1,12 +1,6 @@
 #pragma once
 #include <vulkan/vulkan.h>
 #include <vector>
-#include "VulkanGraphicsResourceInstance.h"
-#include "VulkanGraphicsResourceSurface.h"
-#include "VulkanGraphicsResourceDevice.h"
-#include "VulkanGraphicsResourceSwapchain.h"
-#include "VulkanGraphicsResourceCommandBufferManager.h"
-#include "VulkanGraphicsResourceRenderPassManager.h"
 #include "VulkanGraphicsResourcePipelineManager.h"
 #include "VulkanGraphicsObjectMesh.h"
 #include "VulkanGraphicsObjectTexture.h"
@@ -26,8 +20,6 @@ public:
 	void Invalidate();
 	void SubmitPrimary();
 	void PresentFrame();
-	void BeginRenderPass(const VkCommandBuffer& commandBuffer, int renderPassIndex);
-	void EndRenderPass(const VkCommandBuffer& commandBuffer);
 
 private:
 	void BuildRenderLoop();
@@ -41,11 +33,7 @@ private:
 	void DrawGUI(VkSemaphore& acquireNextImageSemaphore);
 
 private:
-	VulkanGraphicsResourceInstance m_ResourceInstance;
-	VulkanGraphicsResourceSurface m_ResourceSurface;
-	VulkanGraphicsResourceDevice m_ResourceDevice;
-	VulkanGraphicsResourceSwapchain m_ResourceSwapchain;
-	VulkanGraphicsResourceRenderPassManager m_ResourceRenderPassMgr;
+	// TODO: let's remove all these local usage and change these to singleton instance
 	VulkanGraphicsResourcePipelineManager m_ResourcePipelineMgr;
 
 	VulkanGraphicsObjectMesh m_CharacterMesh;
@@ -58,20 +46,21 @@ private:
 	VulkanGraphicsObjectTexture m_DepthBuffer;
 	VulkanGraphicsObjectUniformBuffer m_MVPMatrixUniformBuffer;
 
+	size_t				m_DefaultRenderPassIdentifier;
+	std::vector<size_t> m_BackBufferIdentifierArray;
+	std::vector<size_t> m_FrontBufferIdentifierArray;
+
 	int m_AcquireNextImageSemaphoreIndex;
 	int m_QueueSubmitFenceIndex;
 	int m_QueueSubmitPrimarySemaphoreIndex;
-	std::vector<int> m_BackBufferIndexArray;
-	std::vector<int> m_FrontBufferIndexArray;
 
-private:
-	// TODO: Need to convert this into another object...
-	void CreateDescriptorSet();
-	void DestroyDescriptorSet();
+	size_t m_VertexShaderIdentifier;
+	size_t m_fragmentShaderIdentifier;
+	size_t m_PipelineIdentifier;
+	size_t m_RenderingCommandBufferIdentifier;
 
-	VkDescriptorSetLayout m_DescriptorSetLayout;
-
-	VkDescriptorPool m_DescriptorPool;
-	VkDescriptorSet m_DescriptorSet;
+	size_t	m_ImGuiRenderPassIdentifier;
+	int		m_ImGuiDescriptorPoolIndex;
+	bool	m_ImGuiFontUpdated;
 };
 

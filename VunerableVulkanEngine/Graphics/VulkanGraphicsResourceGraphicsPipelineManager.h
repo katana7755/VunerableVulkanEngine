@@ -6,7 +6,7 @@
 struct VulkanGraphicsPipelineInputData
 {
 	// TODO: render pass (this will be changed after a render pass manager comes out
-	int			m_RenderPassIndex;
+	size_t		m_RenderPassIdentifier;
 	uint32_t	m_SubPassIndex;
 
 	// shaders

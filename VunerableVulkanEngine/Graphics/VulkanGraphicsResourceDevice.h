@@ -6,53 +6,71 @@
 class VulkanGraphicsResourceDevice : public VulkanGraphicsResourceBase
 {
 public:
-	static const int& GetGraphicsQueueFamilyIndex()
+	static VulkanGraphicsResourceDevice& GetInstance();
+
+public:
+	const VkPhysicalDevice& GetPhysicalDevice()
 	{
-		return s_GraphicsQueueFamilyIndex;
+		return m_PhysicalDeviceArray[m_PhysicalDeviceIndex];
 	}
 
-	static const int& GetPresentQueueFamilyIndex()
+	const int& GetGraphicsQueueFamilyIndex()
 	{
-		return s_PresentQueueFamilyIndex;
+		return m_GraphicsQueueFamilyIndex;
 	}
 
-	static const int& GetComputeQueueFamilyIndex()
+	const int& GetPresentQueueFamilyIndex()
 	{
-		return s_ComputeQueueFamilyIndex;
+		return m_PresentQueueFamilyIndex;
 	}
 
-	static const VkPhysicalDevice& GetPhysicalDevice()
+	const int& GetComputeQueueFamilyIndex()
 	{
-		return s_PhysicalDeviceArray[s_PhysicalDeviceIndex];
+		return m_ComputeQueueFamilyIndex;
 	}
 
-	static const VkDevice& GetLogicalDevice()
+	const VkQueue& GetGraphicsQueue()
 	{
-		return s_LogicalDevice;
+		return m_QueueMap[m_GraphicsQueueFamilyIndex];
 	}
 
-	static const VkPhysicalDeviceProperties& GetPhysicalDeviceProperties()
+	const VkQueue& GetPresentQueue()
 	{
-		return s_PhysicalDeviceProperties;
+		return m_QueueMap[m_PresentQueueFamilyIndex];
 	}
 
-	static const VkSurfaceCapabilitiesKHR& GetSurfaceCapabilities()
+	const VkQueue& GetComputeQueue()
 	{
-		return s_SurfaceCapabilities;
+		return m_QueueMap[m_ComputeQueueFamilyIndex];
 	}
 
-	static const std::vector<VkSurfaceFormatKHR>& GetSurfaceFormatArray()
+	const VkDevice& GetLogicalDevice()
 	{
-		return s_SurfaceFormatArray;
+		return m_LogicalDevice;
 	}
 
-	static bool GetMemoryTypeIndex(uint32_t typeBits, VkFlags memoryFlags, uint32_t* outIndex)
+	const VkPhysicalDeviceProperties& GetPhysicalDeviceProperties()
 	{
-		for (int i = 0; i < s_MemoryProperties.memoryTypeCount; ++i)
+		return m_PhysicalDeviceProperties;
+	}
+
+	const VkSurfaceCapabilitiesKHR& GetSurfaceCapabilities()
+	{
+		return m_SurfaceCapabilities;
+	}
+
+	const std::vector<VkSurfaceFormatKHR>& GetSurfaceFormatArray()
+	{
+		return m_SurfaceFormatArray;
+	}
+
+	bool GetMemoryTypeIndex(uint32_t typeBits, VkFlags memoryFlags, uint32_t* outIndex)
+	{
+		for (int i = 0; i < m_MemoryProperties.memoryTypeCount; ++i)
 		{
 			if (typeBits & 1)
 			{
-				if (s_MemoryProperties.memoryTypes[i].propertyFlags & memoryFlags)
+				if (m_MemoryProperties.memoryTypes[i].propertyFlags & memoryFlags)
 				{
 					*outIndex = i;
 					return true;
@@ -65,34 +83,6 @@ public:
 		return false;
 	}
 
-	static const VkQueue& GetGraphicsQueue()
-	{
-		return s_QueueMap[s_GraphicsQueueFamilyIndex];
-	}
-
-	static const VkQueue& GetPresentQueue()
-	{
-		return s_QueueMap[s_PresentQueueFamilyIndex];
-	}
-
-	static const VkQueue& GetComputeQueue()
-	{
-		return s_QueueMap[s_ComputeQueueFamilyIndex];
-	}
-
-private:
-	static std::vector<VkPhysicalDevice> s_PhysicalDeviceArray; // TODO: Think about removing this because it seems redundant...
-	static int s_PhysicalDeviceIndex;
-	static int s_GraphicsQueueFamilyIndex;
-	static int s_PresentQueueFamilyIndex;
-	static int s_ComputeQueueFamilyIndex;
-	static VkDevice s_LogicalDevice;
-	static VkPhysicalDeviceProperties s_PhysicalDeviceProperties;
-	static VkSurfaceCapabilitiesKHR s_SurfaceCapabilities;
-	static std::vector<VkSurfaceFormatKHR> s_SurfaceFormatArray;
-	static VkPhysicalDeviceMemoryProperties s_MemoryProperties;
-	static std::unordered_map<int, VkQueue> s_QueueMap;
-
 protected:
 	virtual bool CreateInternal() override;
 	virtual bool DestroyInternal() override;
@@ -102,5 +92,18 @@ private:
 	bool CreateLogicalDevice();
 	bool DestroyLogicalDevice();
 	void GetDeviceQueueOnlyIfNotExist(int queueFamilyIndex);
+
+private:
+	std::vector<VkPhysicalDevice> m_PhysicalDeviceArray; // TODO: Think about removing this because it seems redundant...
+	int m_PhysicalDeviceIndex;
+	int m_GraphicsQueueFamilyIndex;
+	int m_PresentQueueFamilyIndex;
+	int m_ComputeQueueFamilyIndex;
+	std::unordered_map<int, VkQueue> m_QueueMap;
+	VkDevice m_LogicalDevice;
+	VkPhysicalDeviceProperties m_PhysicalDeviceProperties;
+	VkSurfaceCapabilitiesKHR m_SurfaceCapabilities;
+	std::vector<VkSurfaceFormatKHR> m_SurfaceFormatArray;
+	VkPhysicalDeviceMemoryProperties m_MemoryProperties;
 };
 
