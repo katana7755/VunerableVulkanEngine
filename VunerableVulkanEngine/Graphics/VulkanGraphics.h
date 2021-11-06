@@ -53,7 +53,6 @@ private:
 	size_t m_PipelineIdentifier;
 	size_t m_RenderingCommandBufferIdentifier;
 
-	size_t	m_ImGuiDescriptorPoolIdentifier;
 	size_t	m_ImGuiRenderPassIdentifier;
 	bool	m_ImGuiFontUpdated;
 };

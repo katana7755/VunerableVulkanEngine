@@ -49,7 +49,6 @@ VulkanGraphics::VulkanGraphics()
 	, m_fragmentShaderIdentifier(-1)
 	, m_PipelineIdentifier(-1)
 	, m_RenderingCommandBufferIdentifier(-1)
-	, m_ImGuiDescriptorPoolIdentifier(-1)
 	, m_ImGuiRenderPassIdentifier(-1)
 	, m_ImGuiFontUpdated(false)
 {
@@ -682,16 +681,16 @@ void VulkanGraphics::InitializeGUI(HWND hWnd)
 
 	VulkanGraphicsResourceRenderPassManager::GetInstance().CreateResource(m_ImGuiRenderPassIdentifier, renderPassInputData, m_ImGuiRenderPassIdentifier);
 
-	if (m_ImGuiDescriptorPoolIdentifier == -1)
+	if (m_DescriptorPoolIdentifier == -1)
 	{
-		m_ImGuiDescriptorPoolIdentifier = VulkanGraphicsResourceDescriptorPoolManager::GetInstance().AllocateIdentifier();
+		m_DescriptorPoolIdentifier = VulkanGraphicsResourceDescriptorPoolManager::GetInstance().AllocateIdentifier();
 
 		auto descriptorPoolInputData = VulkanDescriptorPoolInputData();
 		descriptorPoolInputData.CreateDefault();
-		VulkanGraphicsResourceDescriptorPoolManager::GetInstance().CreateResource(m_ImGuiDescriptorPoolIdentifier, descriptorPoolInputData, m_ImGuiDescriptorPoolIdentifier);
+		VulkanGraphicsResourceDescriptorPoolManager::GetInstance().CreateResource(m_DescriptorPoolIdentifier, descriptorPoolInputData, m_DescriptorPoolIdentifier);
 	}
 
-	auto descriptorPool = VulkanGraphicsResourceDescriptorPoolManager::GetInstance().GetResource(m_ImGuiDescriptorPoolIdentifier);
+	auto descriptorPool = VulkanGraphicsResourceDescriptorPoolManager::GetInstance().GetResource(m_DescriptorPoolIdentifier);
 
 	//gImGuiWindow.Surface = VulkanGraphicsResourceSurface::GetSurface();
 	//gImGuiWindow.SurfaceFormat = VkSurfaceFormatKHR { VK_FORMAT_R8G8B8A8_UNORM, VK_COLORSPACE_SRGB_NONLINEAR_KHR };
@@ -733,13 +732,6 @@ void VulkanGraphics::DeinitializeGUI()
 	ImGui_ImplVulkan_Shutdown();
 	ImGui::DestroyContext();
 	m_ImGuiFontUpdated = false;
-
-	if (m_ImGuiDescriptorPoolIdentifier != -1)
-	{
-		VulkanGraphicsResourceDescriptorPoolManager::GetInstance().DestroyResource(m_ImGuiDescriptorPoolIdentifier);
-		VulkanGraphicsResourceDescriptorPoolManager::GetInstance().ReleaseIdentifier(m_ImGuiDescriptorPoolIdentifier);
-		m_ImGuiDescriptorPoolIdentifier = -1;
-	}
 
 	VulkanGraphicsResourceRenderPassManager::GetInstance().DestroyResource(m_ImGuiRenderPassIdentifier);
 	VulkanGraphicsResourceRenderPassManager::GetInstance().ReleaseIdentifier(m_ImGuiRenderPassIdentifier);

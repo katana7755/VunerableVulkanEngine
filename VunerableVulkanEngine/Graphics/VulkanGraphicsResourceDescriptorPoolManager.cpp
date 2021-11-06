@@ -11,11 +11,13 @@ VulkanGraphicsResourceDescriptorPoolManager& VulkanGraphicsResourceDescriptorPoo
 
 VkDescriptorPool VulkanGraphicsResourceDescriptorPoolManager::CreateResourcePhysically(const VulkanDescriptorPoolInputData& inputData)
 {
+    const uint32_t MAX_SET = 10;
+
     auto createInfo = VkDescriptorPoolCreateInfo();
     createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     createInfo.pNext = NULL;
     createInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    createInfo.maxSets = 2;
+    createInfo.maxSets = MAX_SET;
     createInfo.poolSizeCount = inputData.m_PoolSizeArray.size();
     createInfo.pPoolSizes = inputData.m_PoolSizeArray.data();
 
