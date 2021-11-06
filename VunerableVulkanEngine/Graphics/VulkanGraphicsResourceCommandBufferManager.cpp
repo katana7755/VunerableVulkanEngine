@@ -6,6 +6,7 @@
 #include "VulkanGraphicsResourceFrameBufferManager.h"
 #include "VulkanGraphicsResourceGraphicsPipelineManager.h"
 #include "VulkanGraphicsResourcePipelineLayoutManager.h"
+#include "VulkanGraphicsResourceDescriptorSetManager.h"
 #include <algorithm>
 #include "../IMGUI/imgui_impl_vulkan.h"
 
@@ -180,7 +181,14 @@ namespace VulkanGfxExecution
 	{
 		auto& pipelineData = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().GetResource(m_PipelineIdentifier);
 		auto& pipelineLayout = VulkanGraphicsResourcePipelineLayoutManager::GetInstance().GetResource(pipelineData.m_PipelineLayoutIdentifier);
-		vkCmdBindDescriptorSets(commandBuffer, pipelineData.GetBindPoint(), pipelineLayout, 0, m_DescriptorSetArray.size(), m_DescriptorSetArray.data(), 0, NULL); // TODO: what is dynamic offset?
+		auto descriptorSetArray = std::vector<VkDescriptorSet>();
+
+		for (auto identifier : m_DescriptorSetIdentifierArray)
+		{
+			descriptorSetArray.push_back(VulkanGraphicsResourceDescriptorSetManager::GetInstance().GetResource(identifier).m_DescriptorSet);
+		}
+		
+		vkCmdBindDescriptorSets(commandBuffer, pipelineData.GetBindPoint(), pipelineLayout, 0, descriptorSetArray.size(), descriptorSetArray.data(), 0, NULL); // TODO: what is dynamic offset?
 		gfxObjectUsage.Aggregate(m_GfxObjectUsage);
 	}
 

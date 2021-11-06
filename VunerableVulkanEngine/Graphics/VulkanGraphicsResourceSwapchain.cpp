@@ -2,6 +2,7 @@
 #include "../DebugUtility.h"
 #include "VulkanGraphicsResourceSurface.h"
 #include "VulkanGraphicsResourceDevice.h"
+#include "VulkanGraphicsResourceSemaphoreManager.h"
 
 VulkanGraphicsResourceSwapchain g_Instance;
 
@@ -10,9 +11,9 @@ VulkanGraphicsResourceSwapchain& VulkanGraphicsResourceSwapchain::GetInstance()
 	return g_Instance;
 }
 
-void VulkanGraphicsResourceSwapchain::AcquireNextImage(const VkSemaphore& waitSemaphore, const VkFence& waitFence)
+void VulkanGraphicsResourceSwapchain::AcquireNextImage()
 {
-	auto result = vkAcquireNextImageKHR(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_Swapchain, UINT32_MAX, waitSemaphore, waitFence, &m_AcquiredImageIndex);
+	auto result = vkAcquireNextImageKHR(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_Swapchain, UINT32_MAX, GetAcquireImageSemaphore(), VK_NULL_HANDLE, &m_AcquiredImageIndex);
 
 	if (result)
 	{
@@ -21,10 +22,18 @@ void VulkanGraphicsResourceSwapchain::AcquireNextImage(const VkSemaphore& waitSe
 	}
 }
 
+VkSemaphore VulkanGraphicsResourceSwapchain::GetAcquireImageSemaphore()
+{
+	return VulkanGraphicsResourceSemaphoreManager::GetInstance().GetResource(m_AcquireImageSemaphoreIdentifier);
+}
+
 bool VulkanGraphicsResourceSwapchain::CreateInternal()
 {
 	if (!CreateSwapchain())
 		return false;
+
+	m_AcquireImageSemaphoreIdentifier = VulkanGraphicsResourceSemaphoreManager::GetInstance().AllocateIdentifier();
+	VulkanGraphicsResourceSemaphoreManager::GetInstance().CreateResource(m_AcquireImageSemaphoreIdentifier, m_AcquireImageSemaphoreIdentifier, m_AcquireImageSemaphoreIdentifier);
 
 	return CreateImageViews();
 }
@@ -33,6 +42,10 @@ bool VulkanGraphicsResourceSwapchain::DestroyInternal()
 {
 	if (!DestroyImageViews())
 		return false;
+
+	VulkanGraphicsResourceSemaphoreManager::GetInstance().DestroyResource(m_AcquireImageSemaphoreIdentifier);
+	VulkanGraphicsResourceSemaphoreManager::GetInstance().ReleaseIdentifier(m_AcquireImageSemaphoreIdentifier);
+	m_AcquireImageSemaphoreIdentifier = -1;
 
 	return DestroySwapchain();
 }

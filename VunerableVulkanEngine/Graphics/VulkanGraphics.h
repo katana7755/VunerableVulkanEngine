@@ -1,7 +1,6 @@
 #pragma once
 #include <vulkan/vulkan.h>
 #include <vector>
-#include "VulkanGraphicsResourcePipelineManager.h"
 #include "VulkanGraphicsObjectMesh.h"
 #include "VulkanGraphicsObjectTexture.h"
 #include "VulkanGraphicsObjectUniformBuffer.h"
@@ -33,9 +32,6 @@ private:
 	void DrawGUI(VkSemaphore& acquireNextImageSemaphore);
 
 private:
-	// TODO: let's remove all these local usage and change these to singleton instance
-	VulkanGraphicsResourcePipelineManager m_ResourcePipelineMgr;
-
 	VulkanGraphicsObjectMesh m_CharacterMesh;
 	VulkanGraphicsObjectTexture m_CharacterHeadTexture;
 	VulkanGraphicsObjectSampler m_CharacterHeadSampler;
@@ -46,21 +42,19 @@ private:
 	VulkanGraphicsObjectTexture m_DepthBuffer;
 	VulkanGraphicsObjectUniformBuffer m_MVPMatrixUniformBuffer;
 
+	size_t				m_DescriptorPoolIdentifier;
+	size_t				m_DescriptorSetIdentifier;
 	size_t				m_DefaultRenderPassIdentifier;
 	std::vector<size_t> m_BackBufferIdentifierArray;
 	std::vector<size_t> m_FrontBufferIdentifierArray;
-
-	int m_AcquireNextImageSemaphoreIndex;
-	int m_QueueSubmitFenceIndex;
-	int m_QueueSubmitPrimarySemaphoreIndex;
 
 	size_t m_VertexShaderIdentifier;
 	size_t m_fragmentShaderIdentifier;
 	size_t m_PipelineIdentifier;
 	size_t m_RenderingCommandBufferIdentifier;
 
+	size_t	m_ImGuiDescriptorPoolIdentifier;
 	size_t	m_ImGuiRenderPassIdentifier;
-	int		m_ImGuiDescriptorPoolIndex;
 	bool	m_ImGuiFontUpdated;
 };
 

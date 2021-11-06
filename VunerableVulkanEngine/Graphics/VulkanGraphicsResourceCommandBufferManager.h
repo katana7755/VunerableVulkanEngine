@@ -114,9 +114,9 @@ namespace VulkanGfxExecution
 	// TODO: this will be reimplemented with new descriptor set manager
 	struct BindDescriptorSetsExecution : ExecutionBase
 	{
-		size_t							m_PipelineIdentifier;
-		std::vector<VkDescriptorSet>	m_DescriptorSetArray;
-		VulkanGfxObjectUsage			m_GfxObjectUsage;
+		size_t					m_PipelineIdentifier;
+		std::vector<size_t>		m_DescriptorSetIdentifierArray;
+		VulkanGfxObjectUsage	m_GfxObjectUsage;
 
 	private:
 		void Execute(const VkCommandBuffer& commandBuffer, VulkanGfxObjectUsage& gfxObjectUsage) override;

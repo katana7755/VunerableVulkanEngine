@@ -85,9 +85,6 @@
     <ClInclude Include="Graphics\VulkanGraphicsResourceInstance.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="Graphics\VulkanGraphicsResourcePipelineManager.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
     <ClInclude Include="Graphics\VulkanGraphicsResourceRenderPassManager.h">
       <Filter>Graphics</Filter>
     </ClInclude>
@@ -134,6 +131,12 @@
       <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="Graphics\VulkanGraphicsResourceFrameBufferManager.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\VulkanGraphicsResourceDescriptorPoolManager.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\VulkanGraphicsResourceDescriptorSetManager.h">
       <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>
@@ -204,9 +207,6 @@
     <ClCompile Include="Graphics\VulkanGraphicsResourceInstance.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="Graphics\VulkanGraphicsResourcePipelineManager.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
     <ClCompile Include="Graphics\VulkanGraphicsResourceRenderPassManager.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
@@ -259,6 +259,12 @@
       <Filter>Graphics</Filter>
     </ClCompile>
     <ClCompile Include="Graphics\VulkanGraphicsResourceFrameBufferManager.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\VulkanGraphicsResourceDescriptorPoolManager.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\VulkanGraphicsResourceDescriptorSetManager.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
   </ItemGroup>

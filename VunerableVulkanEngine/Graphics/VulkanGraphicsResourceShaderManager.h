@@ -23,6 +23,8 @@ namespace EVulkanShaderBindingResource
 		NONE = -1,
 
 		TEXTURE2D,
+		UNIFORM_BUFFER, // not supported now...
+		STORAGE_BUFFER, // not supported now...
 
 		MAX,
 	};

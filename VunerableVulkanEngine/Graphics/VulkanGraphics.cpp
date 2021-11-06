@@ -25,7 +25,9 @@
 #include "VulkanGraphicsResourcePipelineLayoutManager.h"
 #include "VulkanGraphicsResourceGraphicsPipelineManager.h"
 #include "VulkanGraphicsResourceDescriptorSetLayoutManager.h"
+#include "VulkanGraphicsResourceDescriptorSetManager.h"
 #include "VulkanGraphicsResourcePipelineCache.h"
+#include "VulkanGraphicsResourceDescriptorPoolManager.h"
 
 const int MAX_COMMAND_BUFFER_COUNT = 1;
 
@@ -40,13 +42,15 @@ void check_vk_result(VkResult err)
 }
 
 VulkanGraphics::VulkanGraphics()
-	: m_DefaultRenderPassIdentifier(-1)
+	: m_DescriptorPoolIdentifier(-1)
+	, m_DescriptorSetIdentifier(-1)
+	, m_DefaultRenderPassIdentifier(-1)
 	, m_VertexShaderIdentifier(-1)
 	, m_fragmentShaderIdentifier(-1)
 	, m_PipelineIdentifier(-1)
 	, m_RenderingCommandBufferIdentifier(-1)
+	, m_ImGuiDescriptorPoolIdentifier(-1)
 	, m_ImGuiRenderPassIdentifier(-1)
-	, m_ImGuiDescriptorPoolIndex(-1)
 	, m_ImGuiFontUpdated(false)
 {
 	VulkanGraphicsResourceInstance::GetInstance().Create();
@@ -98,10 +102,16 @@ VulkanGraphics::~VulkanGraphics()
 	m_CharacterBodyTexture.Destroy();
 	m_CharacterMesh.Destroy();
 
-	m_ResourcePipelineMgr.Destroy();
+	if (m_DescriptorPoolIdentifier != -1)
+	{
+		VulkanGraphicsResourceDescriptorPoolManager::GetInstance().DestroyResource(m_DescriptorPoolIdentifier);
+		VulkanGraphicsResourceDescriptorPoolManager::GetInstance().ReleaseIdentifier(m_DescriptorPoolIdentifier);
+		m_DescriptorPoolIdentifier = -1;
+	}
+
 	VulkanGraphicsResourceSwapchain::GetInstance().Destroy();
-	VulkanGraphicsResourceDevice::GetInstance().Destroy();
 	VulkanGraphicsResourceSurface::GetInstance().Destroy();
+	VulkanGraphicsResourceDevice::GetInstance().Destroy();
 	VulkanGraphicsResourceInstance::GetInstance().Destroy();
 }
 
@@ -112,7 +122,6 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 	VulkanGraphicsResourceSurface::GetInstance().Create();
 	VulkanGraphicsResourceDevice::GetInstance().Create();
 	VulkanGraphicsResourceSwapchain::GetInstance().Create();
-	m_ResourcePipelineMgr.Create();
 
 	m_CharacterMesh.CreateFromFBX("../FBXs/free_male_1.FBX");
 	m_CharacterHeadTexture.CreateAsTexture("../PNGs/free_male_1_head_diffuse.png");
@@ -122,10 +131,6 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 	m_ColorBufferSampler.Create();
 	m_DepthBuffer.CreateAsDepthBuffer();
 	m_MVPMatrixUniformBuffer.Create();
-
-	m_AcquireNextImageSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
-	m_QueueSubmitFenceIndex = m_ResourcePipelineMgr.CreateGfxFence();
-	m_QueueSubmitPrimarySemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
 
 	char buffer[1024];
 	GetCurrentDirectory(1024, buffer);
@@ -176,10 +181,15 @@ void VulkanGraphics::Invalidate()
 	m_CharacterBodyTexture.Destroy();
 	m_CharacterMesh.Destroy();
 
-	m_ResourcePipelineMgr.Destroy();
+	if (m_DescriptorPoolIdentifier != -1)
+	{
+		VulkanGraphicsResourceDescriptorPoolManager::GetInstance().DestroyResource(m_DescriptorPoolIdentifier);
+		VulkanGraphicsResourceDescriptorPoolManager::GetInstance().ReleaseIdentifier(m_DescriptorPoolIdentifier);
+		m_DescriptorPoolIdentifier = -1;
+	}
+
 	VulkanGraphicsResourceSwapchain::GetInstance().Destroy();
 	VulkanGraphicsResourceSwapchain::GetInstance().Create();
-	m_ResourcePipelineMgr.Create();
 
 	m_CharacterMesh.CreateFromFBX("../FBXs/free_male_1.FBX");
 	m_CharacterHeadTexture.CreateAsTexture("../PNGs/free_male_1_head_diffuse.png");
@@ -190,25 +200,21 @@ void VulkanGraphics::Invalidate()
 	m_DepthBuffer.CreateAsDepthBuffer();
 	m_MVPMatrixUniformBuffer.Create();
 
-	m_AcquireNextImageSemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
-	m_QueueSubmitFenceIndex = m_ResourcePipelineMgr.CreateGfxFence();
-	m_QueueSubmitPrimarySemaphoreIndex = m_ResourcePipelineMgr.CreateGfxSemaphore();
-
 	BuildRenderLoop();
 }
 
 void VulkanGraphics::SubmitPrimary()
 {
-	auto acquireNextImageSemaphore = m_ResourcePipelineMgr.GetGfxSemaphore(m_AcquireNextImageSemaphoreIndex);
-	VulkanGraphicsResourceSwapchain::GetInstance().AcquireNextImage(acquireNextImageSemaphore, VK_NULL_HANDLE);
+	VulkanGraphicsResourceSwapchain::GetInstance().AcquireNextImage();
 
+	auto acquireImageSemaphore = VulkanGraphicsResourceSwapchain::GetInstance().GetAcquireImageSemaphore();
 	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::ClearAllTemporaryResources>(NULL);
 	TransferAllStagingBuffers();
-	DrawGUI(acquireNextImageSemaphore);
+	DrawGUI(acquireImageSemaphore);
 	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::SubmitAllCommandBuffers>([&](auto* commandPtr) {
-		if (acquireNextImageSemaphore != VK_NULL_HANDLE)
+		if (acquireImageSemaphore != VK_NULL_HANDLE)
 		{
-			commandPtr->m_WaitSemaphoreArray.push_back(acquireNextImageSemaphore);
+			commandPtr->m_WaitSemaphoreArray.push_back(acquireImageSemaphore);
 		}		
 		});
 	VulnerableLayer::ExecuteAllCommands();
@@ -435,19 +441,31 @@ void VulkanGraphics::BuildRenderLoop()
 	auto pipelineData = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().GetResource(m_PipelineIdentifier);
 	auto descriptorSetLayout = VulkanGraphicsResourceDescriptorSetLayoutManager::GetInstance().GetResource(pipelineData.m_DescriptorSetLayoutIdentifiers[EVulkanShaderType::FRAGMENT]);
 
-	auto poolSizeArray = std::vector<VkDescriptorPoolSize>();
+	if (m_DescriptorPoolIdentifier == -1)
 	{
-		auto poolSize = VkDescriptorPoolSize();
-		poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		poolSize.descriptorCount = 2;
-		poolSizeArray.push_back(poolSize);
+		m_DescriptorPoolIdentifier = VulkanGraphicsResourceDescriptorPoolManager::GetInstance().AllocateIdentifier();
+
+		auto inputData = VulkanDescriptorPoolInputData();
+		inputData.CreateDefault();
+		VulkanGraphicsResourceDescriptorPoolManager::GetInstance().CreateResource(m_DescriptorPoolIdentifier, inputData, m_DescriptorPoolIdentifier);
 	}
 
-	int descriptorPoolIndex = m_ResourcePipelineMgr.CreateDescriptorPool(poolSizeArray);
-	int descriptorSetIndex = m_ResourcePipelineMgr.AllocateDescriptorSet(descriptorPoolIndex, descriptorSetLayout);
-	m_ResourcePipelineMgr.UpdateDescriptorSet(descriptorSetIndex, 0, m_CharacterHeadTexture.GetImageView(), m_CharacterHeadSampler.GetSampler());
-	m_ResourcePipelineMgr.UpdateDescriptorSet(descriptorSetIndex, 1, m_CharacterBodyTexture.GetImageView(), m_CharacterBodySampler.GetSampler());
+	if (m_DescriptorSetIdentifier == -1)
+	{
+		m_DescriptorSetIdentifier = VulkanGraphicsResourceDescriptorSetManager::GetInstance().AllocateIdentifier();
 
+		auto inputData = VulkanDescriptorSetInputData();
+		inputData.m_DescriptorPoolIdentifier = m_DescriptorPoolIdentifier;
+		inputData.m_PipelineIdentifier = m_PipelineIdentifier;
+		inputData.m_ShaderType = EVulkanShaderType::FRAGMENT;
+		VulkanGraphicsResourceDescriptorSetManager::GetInstance().CreateResource(m_DescriptorSetIdentifier, inputData, m_DescriptorSetIdentifier);
+
+		auto& outputData = VulkanGraphicsResourceDescriptorSetManager::GetInstance().GetResource(m_DescriptorSetIdentifier);
+		outputData.ClearBindingInfos();
+		outputData.BindCombinedSampler(0, m_CharacterHeadTexture.GetImage(), m_CharacterHeadTexture.GetImageView(), m_CharacterHeadSampler.GetSampler());
+		outputData.BindCombinedSampler(1, m_CharacterBodyTexture.GetImage(), m_CharacterBodyTexture.GetImageView(), m_CharacterBodySampler.GetSampler());
+		outputData.FlushBindingInfos();
+	}
 
 	if (m_RenderingCommandBufferIdentifier == (size_t)-1)
 	{
@@ -488,7 +506,7 @@ void VulkanGraphics::BuildRenderLoop()
 			});
 		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::BindDescriptorSetsExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
 			gfxExecutionPtr->m_PipelineIdentifier = m_PipelineIdentifier;
-			gfxExecutionPtr->m_DescriptorSetArray = std::vector<VkDescriptorSet>(m_ResourcePipelineMgr.GetDescriptorSetArray());
+			gfxExecutionPtr->m_DescriptorSetIdentifierArray.push_back(m_DescriptorSetIdentifier);
 			gfxExecutionPtr->m_GfxObjectUsage.m_ReadTextureArray.push_back(m_CharacterHeadTexture.GetImage());
 			gfxExecutionPtr->m_GfxObjectUsage.m_ReadTextureArray.push_back(m_CharacterBodyTexture.GetImage());
 			});
@@ -664,77 +682,16 @@ void VulkanGraphics::InitializeGUI(HWND hWnd)
 
 	VulkanGraphicsResourceRenderPassManager::GetInstance().CreateResource(m_ImGuiRenderPassIdentifier, renderPassInputData, m_ImGuiRenderPassIdentifier);
 
-	auto poolSizeArray = std::vector<VkDescriptorPoolSize>();
+	if (m_ImGuiDescriptorPoolIdentifier == -1)
 	{
-		auto poolSize = VkDescriptorPoolSize();
-		poolSize.type = VK_DESCRIPTOR_TYPE_SAMPLER;
-		poolSize.descriptorCount = 10;
-		poolSizeArray.push_back(poolSize);
-	}
-	{
-		auto poolSize = VkDescriptorPoolSize();
-		poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		poolSize.descriptorCount = 10;
-		poolSizeArray.push_back(poolSize);
-	}
-	{
-		auto poolSize = VkDescriptorPoolSize();
-		poolSize.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-		poolSize.descriptorCount = 10;
-		poolSizeArray.push_back(poolSize);
-	}
-	{
-		auto poolSize = VkDescriptorPoolSize();
-		poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		poolSize.descriptorCount = 10;
-		poolSizeArray.push_back(poolSize);
-	}
-	{
-		auto poolSize = VkDescriptorPoolSize();
-		poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
-		poolSize.descriptorCount = 10;
-		poolSizeArray.push_back(poolSize);
-	}
-	{
-		auto poolSize = VkDescriptorPoolSize();
-		poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
-		poolSize.descriptorCount = 10;
-		poolSizeArray.push_back(poolSize);
-	}
-	{
-		auto poolSize = VkDescriptorPoolSize();
-		poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		poolSize.descriptorCount = 10;
-		poolSizeArray.push_back(poolSize);
-	}
-	{
-		auto poolSize = VkDescriptorPoolSize();
-		poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		poolSize.descriptorCount = 10;
-		poolSizeArray.push_back(poolSize);
-	}
-	{
-		auto poolSize = VkDescriptorPoolSize();
-		poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-		poolSize.descriptorCount = 10;
-		poolSizeArray.push_back(poolSize);
-	}
-	{
-		auto poolSize = VkDescriptorPoolSize();
-		poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-		poolSize.descriptorCount = 10;
-		poolSizeArray.push_back(poolSize);
-	}
-	{
-		auto poolSize = VkDescriptorPoolSize();
-		poolSize.type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-		poolSize.descriptorCount = 10;
-		poolSizeArray.push_back(poolSize);
+		m_ImGuiDescriptorPoolIdentifier = VulkanGraphicsResourceDescriptorPoolManager::GetInstance().AllocateIdentifier();
+
+		auto descriptorPoolInputData = VulkanDescriptorPoolInputData();
+		descriptorPoolInputData.CreateDefault();
+		VulkanGraphicsResourceDescriptorPoolManager::GetInstance().CreateResource(m_ImGuiDescriptorPoolIdentifier, descriptorPoolInputData, m_ImGuiDescriptorPoolIdentifier);
 	}
 
-	m_ImGuiDescriptorPoolIndex = VulkanGraphicsResourcePipelineManager::CreateDescriptorPool(poolSizeArray);
-
-	auto descriptorPool = VulkanGraphicsResourcePipelineManager::GetDescriptorPool(m_ImGuiDescriptorPoolIndex);
+	auto descriptorPool = VulkanGraphicsResourceDescriptorPoolManager::GetInstance().GetResource(m_ImGuiDescriptorPoolIdentifier);
 
 	//gImGuiWindow.Surface = VulkanGraphicsResourceSurface::GetSurface();
 	//gImGuiWindow.SurfaceFormat = VkSurfaceFormatKHR { VK_FORMAT_R8G8B8A8_UNORM, VK_COLORSPACE_SRGB_NONLINEAR_KHR };
@@ -776,11 +733,17 @@ void VulkanGraphics::DeinitializeGUI()
 	ImGui_ImplVulkan_Shutdown();
 	ImGui::DestroyContext();
 	m_ImGuiFontUpdated = false;
-	VulkanGraphicsResourcePipelineManager::DestroyDescriptorPool(m_ImGuiDescriptorPoolIndex);
+
+	if (m_ImGuiDescriptorPoolIdentifier != -1)
+	{
+		VulkanGraphicsResourceDescriptorPoolManager::GetInstance().DestroyResource(m_ImGuiDescriptorPoolIdentifier);
+		VulkanGraphicsResourceDescriptorPoolManager::GetInstance().ReleaseIdentifier(m_ImGuiDescriptorPoolIdentifier);
+		m_ImGuiDescriptorPoolIdentifier = -1;
+	}
+
 	VulkanGraphicsResourceRenderPassManager::GetInstance().DestroyResource(m_ImGuiRenderPassIdentifier);
 	VulkanGraphicsResourceRenderPassManager::GetInstance().ReleaseIdentifier(m_ImGuiRenderPassIdentifier);
 	m_ImGuiRenderPassIdentifier = -1;
-	m_ImGuiDescriptorPoolIndex = -1;
 }
 
 void VulkanGraphics::DrawGUI(VkSemaphore& acquireNextImageSemaphore)

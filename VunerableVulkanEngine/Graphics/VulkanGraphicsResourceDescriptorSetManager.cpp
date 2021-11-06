@@ -1,68 +1,127 @@
+#include "VulkanGraphicsResourceDescriptorSetManager.h"
+#include "VulkanGraphicsResourceGraphicsPipelineManager.h"
+#include "VulkanGraphicsResourceShaderManager.h"
 #include "VulkanGraphicsResourceDescriptorSetLayoutManager.h"
+#include "VulkanGraphicsResourceDescriptorPoolManager.h"
 #include "VulkanGraphicsResourceDevice.h"
 #include "../DebugUtility.h"
 
-VulkanGraphicsResourceDescriptorSetLayoutManager g_Instance;
+VulkanGraphicsResourceDescriptorSetManager g_Instance;
 
-VulkanGraphicsResourceDescriptorSetLayoutManager& VulkanGraphicsResourceDescriptorSetLayoutManager::GetInstance()
+void VulkanDescriptorSetOutputData::ClearBindingInfos()
 {
-	return g_Instance;
-}
-
-VkDescriptorSetLayout VulkanGraphicsResourceDescriptorSetLayoutManager::CreateResourcePhysically(const VulkanShaderMetaData& shaderMetaData)
-{
-    auto bindingInfoArray = std::vector<VkDescriptorSetLayoutBinding>();
-
-    for (int i = 0; i < shaderMetaData.m_InputBindingArray.size(); ++i)
+    for (auto& writeSet : m_WriteSetArray)
     {
-        auto inputBinding = shaderMetaData.m_InputBindingArray[i];
-
-        if (inputBinding == EVulkanShaderBindingResource::NONE)
+        if (writeSet.pImageInfo != NULL)
         {
-            continue;
+            delete writeSet.pImageInfo;
+            writeSet.pImageInfo = NULL;
         }
 
-        auto bindingInfo = VkDescriptorSetLayoutBinding();
-        bindingInfo.binding = i;
-
-        switch (inputBinding)
+        if (writeSet.pBufferInfo != NULL)
         {
-        case EVulkanShaderBindingResource::TEXTURE2D:
-            bindingInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            break;
-        default:
-            printf_console("[VulkanGraphics] not a valid binding type %d\n", inputBinding);
-
-            throw;
+            delete writeSet.pBufferInfo;
+            writeSet.pBufferInfo = NULL;
         }
 
-        bindingInfo.descriptorCount = 1; // TODO: this also seems useful... but still don't understand what this is for exactly...
-        bindingInfo.stageFlags = shaderMetaData.GetShaderStageBits();
-        bindingInfo.pImmutableSamplers = NULL; // TODO: this also seems useful... but still don't understand what this is for exactly...
-        bindingInfoArray.push_back(bindingInfo);
+        if (writeSet.pTexelBufferView != NULL)
+        {
+            delete writeSet.pTexelBufferView;
+            writeSet.pTexelBufferView = NULL;
+        }
     }
 
-    auto createInfo = VkDescriptorSetLayoutCreateInfo();
-    createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    createInfo.pNext = NULL;
-    createInfo.flags = 0; // TODO: this also seems useful... but still don't understand what this is for exactly...
-    createInfo.bindingCount = bindingInfoArray.size();
-    createInfo.pBindings = bindingInfoArray.data();
+    m_WriteSetArray.clear();
+}
 
-    auto newLayout = VkDescriptorSetLayout();
-    auto result = vkCreateDescriptorSetLayout(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &createInfo, NULL, &newLayout);
+void VulkanDescriptorSetOutputData::BindCombinedSampler(uint32_t binding, const VkImage& image, const VkImageView& imageView, const VkSampler& sampler)
+{
+    auto& pipelineData = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().GetResource(m_PipelineIdentifier);
+    auto& shaderMetaData = VulkanGraphicsResourceShaderManager::GetInstance().GetResourceKey(pipelineData.m_ShaderIdentifiers[m_ShaderType]);
 
-    if (result)
+    if (binding >= shaderMetaData.m_InputBindingArray.size())
     {
-        printf_console("[VulkanGraphics] failed to create a descriptor set layout with error code %d\n", result);
+        printf_console("[VulkanGraphics] binding index %d exceeds binding count %d\n", binding, shaderMetaData.m_InputBindingArray.size());
 
         throw;
     }
 
-    return newLayout;
+    if (shaderMetaData.m_InputBindingArray[binding] != EVulkanShaderBindingResource::TEXTURE2D)
+    {
+        printf_console("[VulkanGraphics] binding index %d is not for a texture binding\n");
+
+        throw;
+    }
+
+    auto writeDescriptorSet = VkWriteDescriptorSet();
+    auto* pImageInfo = new VkDescriptorImageInfo();
+    pImageInfo->sampler = sampler;
+    pImageInfo->imageView = imageView;
+    pImageInfo->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    auto writeSet = VkWriteDescriptorSet();
+    writeSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writeSet.pNext = NULL;
+    writeSet.dstSet = m_DescriptorSet;
+    writeSet.dstBinding = binding;
+    writeSet.dstArrayElement = 0;
+    writeSet.descriptorCount = 1;
+    writeSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writeSet.pImageInfo = pImageInfo;
+    writeSet.pBufferInfo = NULL;
+    writeSet.pTexelBufferView = NULL;
+    m_WriteSetArray.push_back(writeSet);
 }
 
-void VulkanGraphicsResourceDescriptorSetLayoutManager::DestroyResourcePhysicially(const VkDescriptorSetLayout& descriptorSetLayout)
+void VulkanDescriptorSetOutputData::FlushBindingInfos()
 {
-    vkDestroyDescriptorSetLayout(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), descriptorSetLayout, NULL);
+    vkUpdateDescriptorSets(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_WriteSetArray.size(), m_WriteSetArray.data(), 0, NULL);
+}
+
+VulkanGraphicsResourceDescriptorSetManager& VulkanGraphicsResourceDescriptorSetManager::GetInstance()
+{
+	return g_Instance;
+}
+
+VulkanDescriptorSetOutputData VulkanGraphicsResourceDescriptorSetManager::CreateResourcePhysically(const VulkanDescriptorSetInputData& inputData)
+{
+    auto& pipelineData = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().GetResource(inputData.m_PipelineIdentifier);
+    auto& descriptorSetLayout = VulkanGraphicsResourceDescriptorSetLayoutManager::GetInstance().GetResource(pipelineData.m_DescriptorSetLayoutIdentifiers[inputData.m_ShaderType]);
+
+    auto allocateInfo = VkDescriptorSetAllocateInfo();
+    allocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocateInfo.pNext = NULL;
+    allocateInfo.descriptorPool = VulkanGraphicsResourceDescriptorPoolManager::GetInstance().GetResource(inputData.m_DescriptorPoolIdentifier);
+    allocateInfo.descriptorSetCount = 1;
+    allocateInfo.pSetLayouts = &descriptorSetLayout;
+
+    auto outputData = VulkanDescriptorSetOutputData();
+    outputData.m_DescriptorPoolIdentifier = inputData.m_DescriptorPoolIdentifier;
+    outputData.m_PipelineIdentifier = inputData.m_PipelineIdentifier;
+    outputData.m_ShaderType = inputData.m_ShaderType;
+
+    auto result = vkAllocateDescriptorSets(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), &allocateInfo, &outputData.m_DescriptorSet);
+
+    if (result)
+    {
+        printf_console("[VulkanGraphics] failed to allocate a descriptor set with error code %d\n", result);
+
+        throw;
+    }
+
+    return outputData;
+}
+
+void VulkanGraphicsResourceDescriptorSetManager::DestroyResourcePhysicially(const VulkanDescriptorSetOutputData& outputData)
+{
+    const_cast<VulkanDescriptorSetOutputData&>(outputData).ClearBindingInfos();
+
+    auto result = vkFreeDescriptorSets(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), VulkanGraphicsResourceDescriptorPoolManager::GetInstance().GetResource(outputData.m_DescriptorPoolIdentifier), 1, &outputData.m_DescriptorSet);
+
+    if (result)
+    {
+        printf_console("[VulkanGraphics] failed to allocate a descriptor set with error code %d\n", result);
+
+        throw;
+    }
 }

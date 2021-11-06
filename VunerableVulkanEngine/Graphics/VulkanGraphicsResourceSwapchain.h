@@ -13,7 +13,7 @@ public:
 		return m_Swapchain;
 	}
 
-	void AcquireNextImage(const VkSemaphore& waitSemaphore, const VkFence& waitFence);
+	void AcquireNextImage();
 
 	int GetImageCount()
 	{
@@ -63,6 +63,8 @@ public:
 		outHeight = m_SwapchainHeight;
 	}
 
+	VkSemaphore GetAcquireImageSemaphore();
+
 protected:
 	virtual bool CreateInternal() override;
 	virtual bool DestroyInternal() override;
@@ -82,5 +84,6 @@ private:
 	VkFormat m_SwapchainFormat;
 	uint32_t m_SwapchainWith;
 	uint32_t m_SwapchainHeight;
+	size_t m_AcquireImageSemaphoreIdentifier;
 };
 

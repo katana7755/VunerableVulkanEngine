@@ -5,22 +5,21 @@
 
 struct VulkanDescriptorSetInputData
 {
+	size_t					m_DescriptorPoolIdentifier;
 	size_t					m_PipelineIdentifier;
 	EVulkanShaderType::TYPE	m_ShaderType;
 };
 
 struct VulkanDescriptorSetOutputData
 {
-	VkDescriptorSet m_DescriptorSet;
-	size_t			m_ShaderIdentifier;
+	size_t					m_DescriptorPoolIdentifier;
+	size_t					m_PipelineIdentifier;
+	EVulkanShaderType::TYPE	m_ShaderType;
+	VkDescriptorSet			m_DescriptorSet;
 
-	void UpdateCombinedSampler(uint32_t binding, const VkImage& image, const VkImageView& imageView, const VkSampler& sampler)
-	{
-	}
-
-	void Flush()
-	{
-	}
+	void ClearBindingInfos();
+	void BindCombinedSampler(uint32_t binding, const VkImage& image, const VkImageView& imageView, const VkSampler& sampler);
+	void FlushBindingInfos();
 
 private:
 	std::vector<VkWriteDescriptorSet> m_WriteSetArray;
