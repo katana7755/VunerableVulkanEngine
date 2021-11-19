@@ -173,6 +173,10 @@ glslc.exe ../Shaders/Input/coloredtriangle.frag -o ../Shaders/Output/coloredtria
     </CustomBuildStep>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="ECS\ComponentBase.h" />
+    <ClInclude Include="ECS\Domain.h" />
+    <ClInclude Include="ECS\Entity.h" />
+    <ClInclude Include="ECS\SystemBase.h" />
     <ClInclude Include="Editor\EditorGameView.h" />
     <ClInclude Include="Editor\EditorInspector.h" />
     <ClInclude Include="Editor\EditorManager.h" />
@@ -216,6 +220,9 @@ glslc.exe ../Shaders/Input/coloredtriangle.frag -o ../Shaders/Output/coloredtria
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DebugUtility.cpp" />
+    <ClCompile Include="ECS\Domain.cpp" />
+    <ClCompile Include="ECS\ComponentBase.cpp" />
+    <ClCompile Include="ECS\Entity.cpp" />
     <ClCompile Include="Editor\EditorGameView.cpp" />
     <ClCompile Include="Editor\EditorInspector.cpp" />
     <ClCompile Include="Editor\EditorManager.cpp" />

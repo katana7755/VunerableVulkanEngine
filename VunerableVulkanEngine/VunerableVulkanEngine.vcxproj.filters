@@ -17,6 +17,9 @@
     <Filter Include="_Main">
       <UniqueIdentifier>{762ef984-795f-4c37-a08b-23b97cf513dd}</UniqueIdentifier>
     </Filter>
+    <Filter Include="ECS">
+      <UniqueIdentifier>{f4c58ec4-47d4-4265-a910-854f5197bd01}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IMGUI\imconfig.h">
@@ -138,6 +141,18 @@
     </ClInclude>
     <ClInclude Include="Graphics\VulkanGraphicsResourceDescriptorSetManager.h">
       <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="ECS\ComponentBase.h">
+      <Filter>ECS</Filter>
+    </ClInclude>
+    <ClInclude Include="ECS\Domain.h">
+      <Filter>ECS</Filter>
+    </ClInclude>
+    <ClInclude Include="ECS\Entity.h">
+      <Filter>ECS</Filter>
+    </ClInclude>
+    <ClInclude Include="ECS\SystemBase.h">
+      <Filter>ECS</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -266,6 +281,15 @@
     </ClCompile>
     <ClCompile Include="Graphics\VulkanGraphicsResourceDescriptorSetManager.cpp">
       <Filter>Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="ECS\Entity.cpp">
+      <Filter>ECS</Filter>
+    </ClCompile>
+    <ClCompile Include="ECS\ComponentBase.cpp">
+      <Filter>ECS</Filter>
+    </ClCompile>
+    <ClCompile Include="ECS\Domain.cpp">
+      <Filter>ECS</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
