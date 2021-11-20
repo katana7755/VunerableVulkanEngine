@@ -141,9 +141,6 @@ namespace ECS
 		}
 
 		auto& typeInfo = s_TypeInfoArray[lastIndex];
-		
-		//delete typeInfo.FuncCreateComponentArrayPtr;
-
 		s_TypeInfoArray.pop_back();
 	}
 

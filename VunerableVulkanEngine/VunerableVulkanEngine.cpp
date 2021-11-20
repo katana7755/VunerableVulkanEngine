@@ -37,6 +37,48 @@ struct TestAnotherComponent : ECS::ComponentBase
     }
 };
 
+class TestSystem : public ECS::SystemBase
+{
+public:
+    void OnInitialize() override
+    {
+        ECS::Domain::AddComponentTypeToKey<TestComponent>(m_Key);
+    }
+
+    void OnExecute() override
+    {
+        ECS::Domain::ForEach(m_Key, [](const ECS::Entity& entity) {
+            auto componentData = ECS::Domain::GetComponent<TestComponent>(entity);
+            ++componentData.m_Value;
+            ECS::Domain::SetComponent<TestComponent>(entity, componentData);
+            });
+    }
+
+private:
+    ECS::ComponentTypesKey m_Key;
+};
+
+class TestAnotherSystem : public ECS::SystemBase
+{
+public:
+    void OnInitialize() override
+    {
+        ECS::Domain::AddComponentTypeToKey<TestAnotherComponent>(m_Key);
+    }
+
+    void OnExecute() override
+    {
+        ECS::Domain::ForEach(m_Key, [](const ECS::Entity& entity) {
+            auto componentData = ECS::Domain::GetComponent<TestAnotherComponent>(entity);
+            componentData.m_Value += 10.0f;
+            ECS::Domain::SetComponent<TestAnotherComponent>(entity, componentData);
+            });
+    }
+
+private:
+    ECS::ComponentTypesKey m_Key;
+};
+
 #define MAX_LOADSTRING 100
 
 // Global Variables:
@@ -82,10 +124,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         ECS::ComponentTypeUtility::RegisterComponentType<TestComponent>();
         ECS::ComponentTypeUtility::RegisterComponentType<TestAnotherComponent>();
 
-        auto componentTypesKey1 = ECS::Domain::CreateComponentTypesKey();
+        auto componentTypesKey1 = ECS::ComponentTypesKey();
         ECS::Domain::AddComponentTypeToKey<TestComponent>(componentTypesKey1);
 
-        auto componentTypesKey2 = ECS::Domain::CreateComponentTypesKey();
+        auto componentTypesKey2 = ECS::ComponentTypesKey();
         ECS::Domain::AddComponentTypeToKey<TestComponent>(componentTypesKey2);
         ECS::Domain::AddComponentTypeToKey<TestAnotherComponent>(componentTypesKey2);
 
@@ -100,13 +142,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         auto entity3 = ECS::Domain::CreateEntity(componentTypesKey2);
         ECS::Domain::SetComponent<TestComponent>(entity3, TestComponent(5));
         ECS::Domain::SetComponent<TestAnotherComponent>(entity3, TestAnotherComponent(15.0f));
-        ECS::Domain::DestroyEntity(entity2);
+
+        ECS::Domain::CreateSystem<TestSystem>(0);
+        ECS::Domain::CreateSystem<TestAnotherSystem>(1);
+        ECS::Domain::ExecuteSystems();
+        ECS::Domain::ExecuteSystems();
 
         auto component1 = ECS::Domain::GetComponent<TestComponent>(entity1);
+        auto component2 = ECS::Domain::GetComponent<TestComponent>(entity2);
         auto component3 = ECS::Domain::GetComponent<TestComponent>(entity3);
         auto component3another = ECS::Domain::GetComponent<TestAnotherComponent>(entity3);
-        ECS::Domain::DestroyAllEntities();
-        ECS::ComponentTypeUtility::UnregisterAllComponentTypes();
+        ECS::Domain::Terminate();
     }
 
     // Main message loop:

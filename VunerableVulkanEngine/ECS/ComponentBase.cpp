@@ -2,6 +2,8 @@
 
 namespace ECS
 {
+	std::vector<ComponentTypeInfo> ComponentTypeUtility::s_TypeInfoArray;
+
 	void ComponentTypeUtility::UnregisterAllComponentTypes()
 	{
 		s_TypeInfoArray.clear();
@@ -13,6 +15,4 @@ namespace ECS
 
 		return s_TypeInfoArray[componentIndex];
 	}
-
-	std::vector<ComponentTypeInfo> ComponentTypeUtility::s_TypeInfoArray;
 }

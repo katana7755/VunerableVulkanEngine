@@ -25,6 +25,12 @@ namespace ECS
 		static uint32_t s_Next_Allocate_Identifier;
 
 	public:
+		bool operator==(const Entity& rhs)
+		{
+			return m_Identifier == rhs.m_Identifier;
+		}
+
+	public:
 		static const uint32_t INVALID_IDENTIFIER = 0xFFFFFFFF;
 	};
 }

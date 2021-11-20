@@ -7,6 +7,7 @@
 #include <typeindex>
 #include "Entity.h"
 #include "ComponentBase.h"
+#include "SystemBase.h"
 
 #define ECS_MAX_COMPONENTARRAY_COUNT_IN_CHUNK 64
 
@@ -16,7 +17,8 @@ namespace ECS
 
 	struct ComponentArrayChunk
 	{
-		std::vector<uint32_t>			m_EntityIdentifierArray;
+		ComponentTypesKey				m_ComponentTypesKey;
+		std::vector<Entity>				m_EntityArray;
 		std::vector<ComponentTypeInfo>	m_ComponentTypeArray;
 		std::vector<void*>				m_ComponentVectorArray; // std::vector of each component type...
 
@@ -26,11 +28,13 @@ namespace ECS
 
 		ComponentArrayChunk(const ComponentTypesKey& componentTypesKey)
 		{
-			int componentCount = componentTypesKey.count();
+			m_ComponentTypesKey = ComponentTypesKey(componentTypesKey);
+
+			int componentCount = m_ComponentTypesKey.count();
 
 			for (int i = 0; i < ECS_MAX_COMPONENTARRAY_COUNT_IN_CHUNK && componentCount > 0; ++i)
 			{
-				if (componentTypesKey[i] == false)
+				if (m_ComponentTypesKey[i] == false)
 				{
 					continue;
 				}
@@ -54,19 +58,19 @@ namespace ECS
 
 		void AddEntity(const Entity& entity)
 		{
-			m_EntityIdentifierArray.push_back(entity.m_Identifier);
+			m_EntityArray.push_back(entity);
 		}
 
 		void RemoveEntity(uint32_t entityIndex)
 		{
-			uint32_t lastIndex = m_EntityIdentifierArray.size() - 1;
+			uint32_t lastIndex = m_EntityArray.size() - 1;
 
 			if (entityIndex != lastIndex)
 			{
-				m_EntityIdentifierArray[entityIndex] = m_EntityIdentifierArray[lastIndex];
+				m_EntityArray[entityIndex] = m_EntityArray[lastIndex];
 			}
 
-			m_EntityIdentifierArray.pop_back();
+			m_EntityArray.pop_back();
 		}
 	};
 
@@ -76,14 +80,11 @@ namespace ECS
 		Domain() {};
 
 	public:
-		static ComponentTypesKey CreateComponentTypesKey();
-
 		template <class TComponentType>
 		static void AddComponentTypeToKey(ComponentTypesKey& componentTypesKey);
 
 		static Entity CreateEntity(const ComponentTypesKey& componentTypesKey);
 		static void DestroyEntity(const Entity& entity);
-		static void DestroyEntityByIdentifier(const uint32_t& entityIdentifier);
 
 		template <class TComponentType>
 		static TComponentType GetComponent(const Entity& entity);
@@ -91,11 +92,23 @@ namespace ECS
 		template <class TComponentType>
 		static void SetComponent(const Entity& entity, const TComponentType& componentData);
 
-		static void DestroyAllEntities();
+		template <class TSystemType>
+		static uint32_t CreateSystem(uint32_t priority);
+
+		static void DestroySystem(uint32_t systemIdentifier);
+		static void ChangeSystemPriority(uint32_t systemIdentifier, uint32_t priority);
+		static void ExecuteSystems();
+
+		typedef void (*FuncForEachEntity)(const Entity&);
+		static void ForEach(const ComponentTypesKey& componentTypesKey, FuncForEachEntity funcForEachEntity);
+
+		static void Terminate();
 
 	private:
 		static std::unordered_map<uint32_t, ComponentTypesKey>				s_EntityToKeyMap;
 		static std::unordered_map<ComponentTypesKey, ComponentArrayChunk*>	s_KeyToChunkPtrMap;
+		static std::vector<SystemBase*>										s_SystemPtrArray;
+		static bool															s_SystemsNeedToBeSorted;
 	};
 
 	template <class TComponentType>
@@ -122,10 +135,10 @@ namespace ECS
 		assert(chunkPtrIter != s_KeyToChunkPtrMap.end());
 
 		auto& chunk = *(chunkPtrIter->second);
-		auto foundEntityIter = std::find(chunk.m_EntityIdentifierArray.begin(), chunk.m_EntityIdentifierArray.end(), entity.m_Identifier);
-		assert(foundEntityIter != chunk.m_EntityIdentifierArray.end());
+		auto foundEntityIter = std::find(chunk.m_EntityArray.begin(), chunk.m_EntityArray.end(), entity);
+		assert(foundEntityIter != chunk.m_EntityArray.end());
 
-		uint32_t foundEntityIndex = foundEntityIter - chunk.m_EntityIdentifierArray.begin();
+		uint32_t foundEntityIndex = foundEntityIter - chunk.m_EntityArray.begin();
 		auto foundComponentTypeIter = std::find(chunk.m_ComponentTypeArray.begin(), chunk.m_ComponentTypeArray.end(), typeIndex);
 		assert(foundComponentTypeIter != chunk.m_ComponentTypeArray.end());
 
@@ -148,14 +161,30 @@ namespace ECS
 		assert(chunkPtrIter != s_KeyToChunkPtrMap.end());
 
 		auto& chunk = *(chunkPtrIter->second);
-		auto foundEntityIter = std::find(chunk.m_EntityIdentifierArray.begin(), chunk.m_EntityIdentifierArray.end(), entity.m_Identifier);
-		assert(foundEntityIter != chunk.m_EntityIdentifierArray.end());
+		auto foundEntityIter = std::find(chunk.m_EntityArray.begin(), chunk.m_EntityArray.end(), entity);
+		assert(foundEntityIter != chunk.m_EntityArray.end());
 
-		uint32_t foundEntityIndex = foundEntityIter - chunk.m_EntityIdentifierArray.begin();
+		uint32_t foundEntityIndex = foundEntityIter - chunk.m_EntityArray.begin();
 		auto foundComponentTypeIter = std::find(chunk.m_ComponentTypeArray.begin(), chunk.m_ComponentTypeArray.end(), typeIndex);
 		assert(foundComponentTypeIter != chunk.m_ComponentTypeArray.end());
 
 		uint32_t foundComponentTypeIndex = foundComponentTypeIter - chunk.m_ComponentTypeArray.begin();
 		chunk.m_ComponentTypeArray[foundComponentTypeIndex].FuncSetComponentToArray(chunk.m_ComponentVectorArray[foundComponentTypeIndex], foundEntityIndex, (void*)(&componentData));
+	}
+
+	template <class TSystemType>
+	uint32_t Domain::CreateSystem(uint32_t priority)
+	{
+		static_assert(std::is_base_of<SystemBase, TSystemType>::value, "this function should be called with a class derived by ECS::SystemBase.");
+
+		auto* systemPtr = new TSystemType();
+		uint32_t identifier = __COUNTER__;
+		systemPtr->SetIdentifier(identifier);
+		systemPtr->SetPriority(priority);
+		systemPtr->OnInitialize();
+		s_SystemPtrArray.push_back(systemPtr);
+		s_SystemsNeedToBeSorted = true;
+		
+		return identifier;
 	}
 }
