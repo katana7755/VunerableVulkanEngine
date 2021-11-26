@@ -2,7 +2,7 @@
 
 namespace ECS
 {
-	Entity Domain::CreateEntity(const ComponentTypesKey& componentTypesKey)
+	Entity Domain::CreateEntity(const ComponentTypesKey& componentTypesKey, uint32_t identifier)
 	{
 		assert(componentTypesKey.count() < ECS_MAX_COMPONENTARRAY_COUNT_IN_CHUNK);
 		
@@ -14,7 +14,18 @@ namespace ECS
 			chunkPtrIter = s_KeyToChunkPtrMap.find(componentTypesKey);
 		}
 
-		auto newEntity = Entity::Create();
+		auto newEntity = Entity::Create(identifier);
+
+		// to avoid entity duplication when it is new creation
+		if (identifier != Entity::INVALID_IDENTIFIER)
+		{
+			while (s_EntityToKeyMap.find(newEntity.m_Identifier) != s_EntityToKeyMap.end())
+			{
+				newEntity = Entity::Create(identifier);
+			}
+		}
+
+		assert(s_EntityToKeyMap.find(newEntity.m_Identifier) == s_EntityToKeyMap.end());
 		s_EntityToKeyMap[newEntity.m_Identifier] = componentTypesKey;
 
 		auto& chunk = *(s_KeyToChunkPtrMap[componentTypesKey]);

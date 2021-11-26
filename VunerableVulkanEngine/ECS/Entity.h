@@ -14,10 +14,10 @@ namespace ECS
 		Entity() {}
 
 	private:
-		static Entity Create()
+		static Entity Create(uint32_t identifier)
 		{
 			auto newEntity = Entity();
-			newEntity.m_Identifier = s_Next_Allocate_Identifier++;
+			newEntity.m_Identifier = (identifier != INVALID_IDENTIFIER) ? identifier : s_Next_Allocate_Identifier++;
 			return newEntity;
 		}
 

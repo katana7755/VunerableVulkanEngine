@@ -83,7 +83,7 @@ namespace ECS
 		template <class TComponentType>
 		static void AddComponentTypeToKey(ComponentTypesKey& componentTypesKey);
 
-		static Entity CreateEntity(const ComponentTypesKey& componentTypesKey);
+		static Entity CreateEntity(const ComponentTypesKey& componentTypesKey, uint32_t identifier = Entity::INVALID_IDENTIFIER);
 		static void DestroyEntity(const Entity& entity);
 
 		template <class TComponentType>
