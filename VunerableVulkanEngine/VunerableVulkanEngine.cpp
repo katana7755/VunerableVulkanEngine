@@ -5,79 +5,6 @@
 #include "VunerableVulkanEngine.h"
 #include "Graphics/VulkanGraphics.h"
 #include "IMGUI/imgui_impl_win32.h"
-#include "ECS/Domain.h"
-
-struct TestComponent : ECS::ComponentBase
-{
-    int m_Value;
-
-    TestComponent()
-        : m_Value(0)
-    {        
-    }
-
-    TestComponent(int value)
-        : m_Value(value)
-    {
-    }
-};
-
-struct TestAnotherComponent : ECS::ComponentBase
-{
-    float m_Value;
-
-    TestAnotherComponent()
-        : m_Value(0.0f)
-    {
-    }
-
-    TestAnotherComponent(float value)
-        : m_Value(value)
-    {
-    }
-};
-
-class TestSystem : public ECS::SystemBase
-{
-public:
-    void OnInitialize() override
-    {
-        ECS::Domain::AddComponentTypeToKey<TestComponent>(m_Key);
-    }
-
-    void OnExecute() override
-    {
-        ECS::Domain::ForEach(m_Key, [](const ECS::Entity& entity) {
-            auto componentData = ECS::Domain::GetComponent<TestComponent>(entity);
-            ++componentData.m_Value;
-            ECS::Domain::SetComponent<TestComponent>(entity, componentData);
-            });
-    }
-
-private:
-    ECS::ComponentTypesKey m_Key;
-};
-
-class TestAnotherSystem : public ECS::SystemBase
-{
-public:
-    void OnInitialize() override
-    {
-        ECS::Domain::AddComponentTypeToKey<TestAnotherComponent>(m_Key);
-    }
-
-    void OnExecute() override
-    {
-        ECS::Domain::ForEach(m_Key, [](const ECS::Entity& entity) {
-            auto componentData = ECS::Domain::GetComponent<TestAnotherComponent>(entity);
-            componentData.m_Value += 10.0f;
-            ECS::Domain::SetComponent<TestAnotherComponent>(entity, componentData);
-            });
-    }
-
-private:
-    ECS::ComponentTypesKey m_Key;
-};
 
 #define MAX_LOADSTRING 100
 
@@ -118,42 +45,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_VUNERABLEVULKANENGINE));
 
     MSG msg;
-
-    // [DUMMY CODE] TEST MY ECS
-    {
-        ECS::ComponentTypeUtility::RegisterComponentType<TestComponent>();
-        ECS::ComponentTypeUtility::RegisterComponentType<TestAnotherComponent>();
-
-        auto componentTypesKey1 = ECS::ComponentTypesKey();
-        ECS::Domain::AddComponentTypeToKey<TestComponent>(componentTypesKey1);
-
-        auto componentTypesKey2 = ECS::ComponentTypesKey();
-        ECS::Domain::AddComponentTypeToKey<TestComponent>(componentTypesKey2);
-        ECS::Domain::AddComponentTypeToKey<TestAnotherComponent>(componentTypesKey2);
-
-        auto entity1 = ECS::Domain::CreateEntity(componentTypesKey1);
-        auto component = ECS::Domain::GetComponent<TestComponent>(entity1);
-        ++component.m_Value;
-        ECS::Domain::SetComponent<TestComponent>(entity1, component);
-
-        auto entity2 = ECS::Domain::CreateEntity(componentTypesKey2);
-        ECS::Domain::SetComponent<TestComponent>(entity2, TestComponent(3));
-
-        auto entity3 = ECS::Domain::CreateEntity(componentTypesKey2);
-        ECS::Domain::SetComponent<TestComponent>(entity3, TestComponent(5));
-        ECS::Domain::SetComponent<TestAnotherComponent>(entity3, TestAnotherComponent(15.0f));
-
-        ECS::Domain::CreateSystem<TestSystem>(0);
-        ECS::Domain::CreateSystem<TestAnotherSystem>(1);
-        ECS::Domain::ExecuteSystems();
-        ECS::Domain::ExecuteSystems();
-
-        auto component1 = ECS::Domain::GetComponent<TestComponent>(entity1);
-        auto component2 = ECS::Domain::GetComponent<TestComponent>(entity2);
-        auto component3 = ECS::Domain::GetComponent<TestComponent>(entity3);
-        auto component3another = ECS::Domain::GetComponent<TestAnotherComponent>(entity3);
-        ECS::Domain::Terminate();
-    }
 
     // Main message loop:
     while (GetMessage(&msg, nullptr, 0, 0))
