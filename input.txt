@@ -1,0 +1,3 @@
+Hi folks
+This is a input file for my initial test regarding SceneManager
+I hope this would work without many exceptions

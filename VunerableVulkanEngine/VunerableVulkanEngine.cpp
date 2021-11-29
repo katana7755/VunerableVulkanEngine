@@ -5,6 +5,9 @@
 #include "VunerableVulkanEngine.h"
 #include "Graphics/VulkanGraphics.h"
 #include "IMGUI/imgui_impl_win32.h"
+#include "GameCore/ProjectManager.h"
+#include "GameCore/SceneManager.h"
+#include <shlobj.h>
 
 #define MAX_LOADSTRING 100
 
@@ -30,6 +33,37 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(lpCmdLine);
 
     // TODO: Place code here.
+    if (GameCore::ProjectManager::GetInstance().LoadRecentlyModifiedProject())
+    {
+        GameCore::SceneManager::GetInstance().LoadRecentlyModifiedScene();
+    }
+    else
+    {
+        CHAR szBuffer[MAX_PATH] = { 0, };
+        auto info = BROWSEINFO{ 0 };
+        info.lpszTitle = "Select project folder";
+        info.pszDisplayName = szBuffer;
+        info.ulFlags = BIF_EDITBOX | BIF_NEWDIALOGSTYLE;
+
+        while (true)
+        {
+            auto idl = SHBrowseForFolder(&info);
+
+            if (idl == 0)
+            {
+                return FALSE;
+            }
+
+            SHGetPathFromIDList(idl, szBuffer);
+
+            if (!GameCore::ProjectManager::GetInstance().CreateProject(szBuffer))
+            {
+                continue;
+            }
+
+            break;
+        }
+    }
 
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -43,7 +77,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     }
 
     HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_VUNERABLEVULKANENGINE));
-
     MSG msg;
 
     // Main message loop:

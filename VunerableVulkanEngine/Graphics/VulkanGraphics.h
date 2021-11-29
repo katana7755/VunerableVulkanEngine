@@ -1,4 +1,9 @@
 #pragma once
+
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
 #include <vulkan/vulkan.h>
 #include <vector>
 #include "VulkanGraphicsObjectMesh.h"

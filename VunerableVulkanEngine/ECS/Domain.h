@@ -13,7 +13,7 @@
 
 namespace ECS
 {
-	typedef std::bitset<ECS_MAX_COMPONENTARRAY_COUNT_IN_CHUNK>	ComponentTypesKey;
+	typedef std::bitset<ECS_MAX_REGISTERED_COMPONENTTYPE_COUNT>	ComponentTypesKey;
 
 	struct ComponentArrayChunk
 	{
@@ -28,11 +28,13 @@ namespace ECS
 
 		ComponentArrayChunk(const ComponentTypesKey& componentTypesKey)
 		{
+			assert(componentTypesKey.count() < ECS_MAX_COMPONENTARRAY_COUNT_IN_CHUNK);
+
 			m_ComponentTypesKey = ComponentTypesKey(componentTypesKey);
 
 			int componentCount = m_ComponentTypesKey.count();
 
-			for (int i = 0; i < ECS_MAX_COMPONENTARRAY_COUNT_IN_CHUNK && componentCount > 0; ++i)
+			for (int i = 0; i < ECS_MAX_REGISTERED_COMPONENTTYPE_COUNT && componentCount > 0; ++i)
 			{
 				if (m_ComponentTypesKey[i] == false)
 				{
@@ -99,8 +101,35 @@ namespace ECS
 		static void ChangeSystemPriority(uint32_t systemIdentifier, uint32_t priority);
 		static void ExecuteSystems();
 
-		typedef void (*FuncForEachEntity)(const Entity&);
-		static void ForEach(const ComponentTypesKey& componentTypesKey, FuncForEachEntity funcForEachEntity);
+		template <typename FuncForEachEntity>
+		static void ForEach(const ComponentTypesKey& componentTypesKey, FuncForEachEntity funcForEachEntity)
+		{
+			int componentCount = componentTypesKey.count();
+
+			for (auto chunkPtrPair : s_KeyToChunkPtrMap)
+			{
+				if ((chunkPtrPair.first & componentTypesKey).count() != componentCount)
+				{
+					continue;
+				}
+
+				auto& chunk = (*(chunkPtrPair.second));
+
+				for (auto& entity : chunk.m_EntityArray)
+				{
+					funcForEachEntity(entity);
+				}
+			}
+		}
+
+		template <typename FunctorForEachChunk>
+		static void ForEach(FunctorForEachChunk funcForEachChunk)
+		{
+			for (auto chunkPtrPair : s_KeyToChunkPtrMap)
+			{
+				funcForEachChunk(chunkPtrPair.second);
+			}
+		}
 
 		static void Terminate();
 
@@ -118,6 +147,7 @@ namespace ECS
 
 		uint32_t componentTypeIndex = ComponentTypeUtility::FindComponentIndex<TComponentType>();
 		assert(componentTypeIndex != ComponentBase::INVALID_IDENTIFIER);
+		assert(componentTypesKey.count() < ECS_MAX_COMPONENTARRAY_COUNT_IN_CHUNK);
 
 		componentTypesKey[componentTypeIndex] = true;
 	}

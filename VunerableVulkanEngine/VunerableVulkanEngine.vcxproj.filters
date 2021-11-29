@@ -20,6 +20,21 @@
     <Filter Include="ECS">
       <UniqueIdentifier>{f4c58ec4-47d4-4265-a910-854f5197bd01}</UniqueIdentifier>
     </Filter>
+    <Filter Include="GameCore">
+      <UniqueIdentifier>{72703327-d468-4d4e-97e4-abc0de0fa9a7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="rapidjson">
+      <UniqueIdentifier>{b2c8c331-fbf1-4881-a898-240b5cd5c868}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="rapidjson\error">
+      <UniqueIdentifier>{39a44720-372b-4919-88fb-26f64052c65e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="rapidjson\internal">
+      <UniqueIdentifier>{47d23755-48bf-4892-adce-1937580340e4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="rapidjson\msinttypes">
+      <UniqueIdentifier>{a2516b5e-1a2b-4d91-b7da-35771b4ab064}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IMGUI\imconfig.h">
@@ -152,6 +167,132 @@
       <Filter>ECS</Filter>
     </ClInclude>
     <ClInclude Include="ECS\SystemBase.h">
+      <Filter>ECS</Filter>
+    </ClInclude>
+    <ClInclude Include="GameCore\SceneManager.h">
+      <Filter>GameCore</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\allocators.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\cursorstreamwrapper.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\document.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\encodedstream.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\encodings.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\filereadstream.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\filewritestream.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\fwd.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\istreamwrapper.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\memorybuffer.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\memorystream.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\ostreamwrapper.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\pointer.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\prettywriter.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\rapidjson.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\reader.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\schema.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\stream.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\stringbuffer.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\uri.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\writer.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\error\en.h">
+      <Filter>rapidjson\error</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\error\error.h">
+      <Filter>rapidjson\error</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\biginteger.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\clzll.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\diyfp.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\dtoa.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\ieee754.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\itoa.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\meta.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\pow10.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\regex.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\stack.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\strfunc.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\strtod.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\internal\swap.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\msinttypes\inttypes.h">
+      <Filter>rapidjson\msinttypes</Filter>
+    </ClInclude>
+    <ClInclude Include="rapidjson\msinttypes\stdint.h">
+      <Filter>rapidjson\msinttypes</Filter>
+    </ClInclude>
+    <ClInclude Include="GameCore\ProjectManager.h">
+      <Filter>GameCore</Filter>
+    </ClInclude>
+    <ClInclude Include="ECS\JsonDeserialize.h">
+      <Filter>ECS</Filter>
+    </ClInclude>
+    <ClInclude Include="ECS\JsonSerialize.h">
       <Filter>ECS</Filter>
     </ClInclude>
   </ItemGroup>
@@ -289,6 +430,18 @@
       <Filter>ECS</Filter>
     </ClCompile>
     <ClCompile Include="ECS\Domain.cpp">
+      <Filter>ECS</Filter>
+    </ClCompile>
+    <ClCompile Include="GameCore\SceneManager.cpp">
+      <Filter>GameCore</Filter>
+    </ClCompile>
+    <ClCompile Include="GameCore\ProjectManager.cpp">
+      <Filter>GameCore</Filter>
+    </ClCompile>
+    <ClCompile Include="ECS\JsonDeserialize.cpp">
+      <Filter>ECS</Filter>
+    </ClCompile>
+    <ClCompile Include="ECS\JsonSerialize.cpp">
       <Filter>ECS</Filter>
     </ClCompile>
   </ItemGroup>

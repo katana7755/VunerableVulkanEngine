@@ -4,14 +4,22 @@
 #include <typeindex>
 #include <vector>
 #include <algorithm>
+#include "Entity.h"
+#include "../rapidjson/document.h"
 #include "../DebugUtility.h"
 
 #define ECS_MAX_REGISTERED_COMPONENTTYPE_COUNT 512
 
 namespace ECS
 {
+	typedef rapidjson::GenericObject<false, rapidjson::GenericValue<rapidjson::UTF8<>>> RapidJsonObject;
+
 	struct ComponentBase
 	{
+	public:
+		virtual void JsonDeserialize(RapidJsonObject& jsonEntityObject, const Entity& newEntity) = 0;
+		virtual void JsonSerialize(RapidJsonObject& jsonEntityObject, const Entity& newEntity) = 0;
+
 	public:
 		static const uint32_t INVALID_IDENTIFIER = 0xFFFFFFFF;
 	};
@@ -26,6 +34,8 @@ namespace ECS
 		void (*FuncRemoveComponentFromArray)(void* componentVectorPtr, uint32_t index);
 		void* (*FuncGetComponentFromArray)(void* componentVectorPtr, uint32_t index);
 		void (*FuncSetComponentToArray)(void* componentVectorPtr, uint32_t index, void* componentDataPtr);
+		void (*FuncDeserializeComponent)(RapidJsonObject& jsonEntityObject, const Entity& newEntity);
+		void (*FuncSerializeComponent)(RapidJsonObject& jsonEntityObject, const Entity& newEntity);
 
 		bool operator==(const std::type_index& typeIndex)
 		{
@@ -51,6 +61,8 @@ namespace ECS
 		static uint32_t FindComponentIndex();
 
 		static ComponentTypeInfo& GetComponentTypeInfo(uint32_t componentIndex);
+		static void JsonDeserializeComponent(RapidJsonObject& entityObject, const Entity& newEntity, uint32_t componentIndex);
+		static void JsonSerializeComponent(RapidJsonObject& entityObject, const Entity& newEntity, uint32_t componentIndex);
 
 	private:
 		static std::vector<ComponentTypeInfo> s_TypeInfoArray;
@@ -123,6 +135,8 @@ namespace ECS
 			assert(index >= 0 && index < componentVectorRef.size());
 			componentVectorRef[index] = (*(TComponentType*)componentDataPtr);
 		};
+		typeInfo.FuncDeserializeComponent = TComponentType::JsonDeserialize;
+		typeInfo.FuncSerializeComponent = TComponentType::JsonSerialize;
 		s_TypeInfoArray.push_back(typeInfo);
 	}
 

@@ -105,26 +105,6 @@ namespace ECS
 		}
 	}
 
-	void Domain::ForEach(const ComponentTypesKey& componentTypesKey, FuncForEachEntity funcForEachEntity)
-	{
-		int componentCount = componentTypesKey.count();
-
-		for (auto chunkPtrPair : s_KeyToChunkPtrMap)
-		{
-			if ((chunkPtrPair.first & componentTypesKey).count() != componentCount)
-			{
-				continue;
-			}
-
-			auto& chunk = (*(chunkPtrPair.second));
-
-			for (auto& entity : chunk.m_EntityArray)
-			{
-				funcForEachEntity(entity);
-			}
-		}
-	}
-
 	void Domain::Terminate()
 	{
 		for (auto chunkPtrPair : s_KeyToChunkPtrMap)

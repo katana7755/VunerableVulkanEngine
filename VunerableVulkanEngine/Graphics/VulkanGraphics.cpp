@@ -1,6 +1,5 @@
 #define GLM_FORCE_RADIANS
 
-#include <Windows.h>
 #include <stdio.h>
 #include "VulkanGraphics.h"
 #include "vulkan/vulkan_win32.h" // TODO: need to consider other platfroms such as Android, Linux etc... in the future
@@ -131,9 +130,9 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 	m_DepthBuffer.CreateAsDepthBuffer();
 	m_MVPMatrixUniformBuffer.Create();
 
-	char buffer[1024];
-	GetCurrentDirectory(1024, buffer);
-	printf_console("[VulkanGraphics] ***** current directory is ... %s\n", buffer);
+	//char buffer[1024];
+	//GetCurrentDirectory(1024, buffer);
+	//printf_console("[VulkanGraphics] ***** current directory is ... %s\n", buffer);
 
 	VulnerableLayer::Initialize();
 
