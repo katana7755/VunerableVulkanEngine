@@ -4,6 +4,7 @@
 #include <typeindex>
 #include <vector>
 #include <algorithm>
+#include <string>
 #include "Entity.h"
 #include "../rapidjson/document.h"
 #include "../DebugUtility.h"
@@ -17,15 +18,12 @@ namespace ECS
 	struct ComponentBase
 	{
 	public:
-		virtual void JsonDeserialize(RapidJsonObject& jsonEntityObject, const Entity& newEntity) = 0;
-		virtual void JsonSerialize(RapidJsonObject& jsonEntityObject, const Entity& newEntity) = 0;
-
-	public:
 		static const uint32_t INVALID_IDENTIFIER = 0xFFFFFFFF;
 	};
 
 	struct ComponentTypeInfo
 	{
+		std::string m_Name;
 		size_t m_TypeHashCode;
 
 		void* (*FuncCreateComponentArray)();
@@ -54,8 +52,10 @@ namespace ECS
 		template <class TComponentType>
 		static void RegisterComponentType();
 
-		template <class TComponentType>
-		static void UnregisterComponentType();
+		static uint32_t GetComponentTypeCount();
+
+		//template <class TComponentType>
+		//static void UnregisterComponentType();
 
 		template <class TComponentType>
 		static uint32_t FindComponentIndex();
@@ -89,6 +89,7 @@ namespace ECS
 		}
 
 		auto typeInfo = ComponentTypeInfo();
+		typeInfo.m_Name = typeid(TComponentType).name();
 		typeInfo.m_TypeHashCode = typeHashCode;
 		typeInfo.FuncCreateComponentArray = []() {
 			return (void*)(new std::vector<TComponentType>());
@@ -135,28 +136,28 @@ namespace ECS
 			assert(index >= 0 && index < componentVectorRef.size());
 			componentVectorRef[index] = (*(TComponentType*)componentDataPtr);
 		};
-		typeInfo.FuncDeserializeComponent = TComponentType::JsonDeserialize;
-		typeInfo.FuncSerializeComponent = TComponentType::JsonSerialize;
+		typeInfo.FuncDeserializeComponent = &TComponentType::JsonDeserialize;
+		typeInfo.FuncSerializeComponent = &TComponentType::JsonSerialize;
 		s_TypeInfoArray.push_back(typeInfo);
 	}
 
-	template <class TComponentType>
-	void ComponentTypeUtility::UnregisterComponentType()
-	{
-		// TODO: need to consider multex for supporting multi threading?
-		static_assert(std::is_base_of<ComponentBase, TComponentType>::value, "this function should be called with a class derived by ECS::ComponentBase.");
+	//template <class TComponentType>
+	//void ComponentTypeUtility::UnregisterComponentType()
+	//{
+	//	// TODO: need to consider multex for supporting multi threading?
+	//	static_assert(std::is_base_of<ComponentBase, TComponentType>::value, "this function should be called with a class derived by ECS::ComponentBase.");
 
-		uint32_t foundIndex = FindComponentIndex<TComponentType>();
-		uint32_t lastIndex = s_TypeInfoArray.size() - 1;
+	//	uint32_t foundIndex = FindComponentIndex<TComponentType>();
+	//	uint32_t lastIndex = s_TypeInfoArray.size() - 1;
 
-		if (foundIndex != lastIndex)
-		{
-			s_TypeInfoArray[foundIndex] = s_TypeInfoArray[lastIndex];
-		}
+	//	if (foundIndex != lastIndex)
+	//	{
+	//		s_TypeInfoArray[foundIndex] = s_TypeInfoArray[lastIndex];
+	//	}
 
-		auto& typeInfo = s_TypeInfoArray[lastIndex];
-		s_TypeInfoArray.pop_back();
-	}
+	//	auto& typeInfo = s_TypeInfoArray[lastIndex];
+	//	s_TypeInfoArray.pop_back();
+	//}
 
 	template <class TComponentType>
 	uint32_t ComponentTypeUtility::FindComponentIndex()

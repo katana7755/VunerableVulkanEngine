@@ -2,9 +2,54 @@
 
 namespace ECS
 {
+	bool Domain::IsChunkExist(const ComponentTypesKey& componentTypesKey)
+	{
+		assert(componentTypesKey.count() <= ECS_MAX_COMPONENTARRAY_COUNT_IN_CHUNK);
+
+		return s_KeyToChunkPtrMap.find(componentTypesKey) != s_KeyToChunkPtrMap.end();
+	}
+
+	bool Domain::IsAliveEntity(const Entity& entity)
+	{
+		return s_EntityToKeyMap.find(entity.m_Identifier) != s_EntityToKeyMap.end();
+	}
+
+	const ComponentTypesKey& Domain::GetComponentTypesKey(const Entity& entity)
+	{
+		assert(s_EntityToKeyMap.find(entity.m_Identifier) != s_EntityToKeyMap.end());
+
+		return s_EntityToKeyMap[entity.m_Identifier];
+	}
+
+	void Domain::CreateChunk(const ComponentTypesKey& componentTypesKey)
+	{
+		assert(s_KeyToChunkPtrMap.find(componentTypesKey) == s_KeyToChunkPtrMap.end());
+
+		s_KeyToChunkPtrMap[componentTypesKey] = new ComponentArrayChunk(componentTypesKey);
+	}
+
+	void Domain::DestroyChunk(const ComponentTypesKey& componentTypesKey)
+	{
+		auto chunkPtrIter = s_KeyToChunkPtrMap.find(componentTypesKey);
+		assert(chunkPtrIter != s_KeyToChunkPtrMap.end());
+
+		auto& entityArray = chunkPtrIter->second->m_EntityArray;
+
+		for (uint32_t i = 0; i < entityArray.size(); ++i)
+		{
+			auto keyIter = s_EntityToKeyMap.find(entityArray[i].m_Identifier);
+			assert(keyIter != s_EntityToKeyMap.end());
+
+			s_EntityToKeyMap.erase(keyIter);
+		}
+
+		delete chunkPtrIter->second;
+		s_KeyToChunkPtrMap.erase(chunkPtrIter);
+	}
+
 	Entity Domain::CreateEntity(const ComponentTypesKey& componentTypesKey, uint32_t identifier)
 	{
-		assert(componentTypesKey.count() < ECS_MAX_COMPONENTARRAY_COUNT_IN_CHUNK);
+		assert(componentTypesKey.count() <= ECS_MAX_COMPONENTARRAY_COUNT_IN_CHUNK);
 		
 		auto chunkPtrIter = s_KeyToChunkPtrMap.find(componentTypesKey);
 
@@ -123,18 +168,6 @@ namespace ECS
 		s_SystemPtrArray.clear();
 		s_SystemsNeedToBeSorted = false;
 		ComponentTypeUtility::UnregisterAllComponentTypes();
-
-		//std::vector<uint32_t> identifierArray;
-
-		//for (auto pair : s_EntityToKeyMap)
-		//{
-		//	identifierArray.push_back(pair.first);
-		//}
-
-		//for (auto identifier : identifierArray)
-		//{
-		//	DestroyEntityByIdentifier(identifier);
-		//}
 	}
 
 	std::unordered_map<uint32_t, ComponentTypesKey>	Domain::s_EntityToKeyMap;

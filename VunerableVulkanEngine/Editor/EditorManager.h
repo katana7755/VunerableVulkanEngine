@@ -27,21 +27,16 @@ protected:
 class EditorManager
 {
 public:
-	static void DrawEditors()
-	{
-		return s_UniquePtr->DrawEditorsInternal();
-	}
+	static EditorManager& GetInstance();
 
-private:
-	static EditorManager s_Instance;
-	static EditorManager* s_UniquePtr;
-
-private:
+public:
 	EditorManager();
 	~EditorManager();
 
-	void DrawEditorsInternal();
-	void RegisterEditorInternal(EditorBase* editorPtr);
+public:
+	void DrawEditors();
+	void RegisterEditor(EditorBase* editorPtr);
 
+private:
 	std::vector<EditorBase*> m_RegisteredEditors;
 };

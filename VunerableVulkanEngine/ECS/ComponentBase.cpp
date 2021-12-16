@@ -16,6 +16,11 @@ namespace ECS
 		return s_TypeInfoArray[componentIndex];
 	}
 
+	uint32_t ComponentTypeUtility::GetComponentTypeCount()
+	{
+		return s_TypeInfoArray.size();
+	}
+
 	void ComponentTypeUtility::JsonDeserializeComponent(RapidJsonObject& jsonEntityObject, const Entity& newEntity, uint32_t componentIndex)
 	{
 		auto& typeInfo = GetComponentTypeInfo(componentIndex);

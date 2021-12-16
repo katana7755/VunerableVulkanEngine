@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <bitset>
 #include <typeindex>
+#include <string>
 #include "Entity.h"
 #include "ComponentBase.h"
 #include "SystemBase.h"
@@ -74,6 +75,31 @@ namespace ECS
 
 			m_EntityArray.pop_back();
 		}
+
+		std::string GetComponentsKeyAsString()
+		{
+			std::string strKey;
+
+			int componentCount = m_ComponentTypesKey.count();
+
+			for (int i = 0; i < ECS_MAX_REGISTERED_COMPONENTTYPE_COUNT && componentCount > 0; ++i)
+			{
+				if (m_ComponentTypesKey[i] == false)
+				{
+					continue;
+				}
+
+				auto& typeInfo = ComponentTypeUtility::GetComponentTypeInfo(i);
+				strKey += typeInfo.m_Name;
+			}
+
+			if (strKey.empty())
+			{
+				strKey = "[Empty Key]";
+			}
+
+			return strKey;
+		}
 	};
 
 	class Domain
@@ -85,6 +111,11 @@ namespace ECS
 		template <class TComponentType>
 		static void AddComponentTypeToKey(ComponentTypesKey& componentTypesKey);
 
+		static bool IsChunkExist(const ComponentTypesKey& componentTypesKey);
+		static bool IsAliveEntity(const Entity& entity);
+		static const ComponentTypesKey& GetComponentTypesKey(const Entity& entity);
+		static void CreateChunk(const ComponentTypesKey& componentTypesKey);
+		static void DestroyChunk(const ComponentTypesKey& componentTypesKey);
 		static Entity CreateEntity(const ComponentTypesKey& componentTypesKey, uint32_t identifier = Entity::INVALID_IDENTIFIER);
 		static void DestroyEntity(const Entity& entity);
 

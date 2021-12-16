@@ -6,6 +6,7 @@
 #include "../ECS/JsonSerialize.h"
 #include "../rapidjson/stringbuffer.h"
 #include "../rapidjson/prettywriter.h"
+#include "GameCoreComponentClasses.h"
 #include "../DebugUtility.h"
 
 namespace GameCore
@@ -32,6 +33,7 @@ namespace GameCore
 		}
 
 		ECS::Domain::Terminate();
+		ECS::ComponentTypeUtility::RegisterComponentType<TransformComponent>();
 
 		std::string strResourcePath = ProjectManager::GetInstance().GetResourcePath(strPath);
 		std::string strJson;

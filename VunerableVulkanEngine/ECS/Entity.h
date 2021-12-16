@@ -11,7 +11,10 @@ namespace ECS
 		uint32_t m_Identifier;
 
 	private:
-		Entity() {}
+		Entity() 
+		{
+			m_Identifier = INVALID_IDENTIFIER;
+		}
 
 	private:
 		static Entity Create(uint32_t identifier)
@@ -31,6 +34,7 @@ namespace ECS
 		}
 
 	public:
-		static const uint32_t INVALID_IDENTIFIER = 0xFFFFFFFF;
+		static const uint32_t	INVALID_IDENTIFIER = 0xFFFFFFFF;
+		static const Entity		INVALID_ENTITY;
 	};
 }

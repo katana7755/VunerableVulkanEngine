@@ -27,13 +27,16 @@ namespace ECS
 			auto entityObject = jsonEntityObject.GetObject();
 			entityObject.AddMember("m_Identifier", rapidjson::Value().SetUint(entity.m_Identifier), allocator);
 
-			for (uint32_t componentIndex = 0; componentIndex < ECS_MAX_REGISTERED_COMPONENTTYPE_COUNT; ++componentIndex)
+			int componentCount = componentTypesKey.count();
+
+			for (int componentIndex = 0; componentIndex < ECS_MAX_REGISTERED_COMPONENTTYPE_COUNT && componentCount > 0; ++componentIndex)
 			{
 				if (componentTypesKey[componentIndex] == 0)
 				{
 					continue;
 				}
 
+				--componentCount;
 				ComponentTypeUtility::JsonSerializeComponent(entityObject, entity, componentIndex);
 			}
 		}

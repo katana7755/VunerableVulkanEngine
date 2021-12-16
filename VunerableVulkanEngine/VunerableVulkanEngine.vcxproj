@@ -185,6 +185,7 @@ glslc.exe ../Shaders/Input/coloredtriangle.frag -o ../Shaders/Output/coloredtria
     <ClInclude Include="Editor\EditorManager.h" />
     <ClInclude Include="Editor\EditorProjectBrowser.h" />
     <ClInclude Include="Editor\EditorSceneBrowser.h" />
+    <ClInclude Include="GameCore\GameCoreComponentClasses.h" />
     <ClInclude Include="GameCore\ProjectManager.h" />
     <ClInclude Include="GameCore\SceneManager.h" />
     <ClInclude Include="Graphics\VulkanGraphics.h" />

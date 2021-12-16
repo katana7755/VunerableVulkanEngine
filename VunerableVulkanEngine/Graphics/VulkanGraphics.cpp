@@ -767,7 +767,7 @@ void VulkanGraphics::DrawGUI(VkSemaphore& acquireNextImageSemaphore)
 	ImGui_ImplVulkan_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
-	EditorManager::DrawEditors();
+	EditorManager::GetInstance().DrawEditors();
 
 	// Rendering
 	ImGui::Render();

@@ -5,9 +5,6 @@
 #include "EditorProjectBrowser.h"
 #include "EditorGameView.h"
 
-EditorManager EditorManager::s_Instance;
-EditorManager* EditorManager::s_UniquePtr = &EditorManager::s_Instance;
-
 EditorBase::EditorBase()
 {
     m_IsChecked = true;
@@ -17,12 +14,19 @@ EditorBase::~EditorBase()
 {
 }
 
+EditorManager g_Instance;
+
+EditorManager& EditorManager::GetInstance()
+{
+    return g_Instance;
+}
+
 EditorManager::EditorManager()
 {
-    RegisterEditorInternal(new EditorInspector());
-    RegisterEditorInternal(new EditorSceneBrowser());
-    RegisterEditorInternal(new EditorProjectBrowser());
-    RegisterEditorInternal(new EditorGameView());
+    RegisterEditor(new EditorInspector());
+    RegisterEditor(new EditorSceneBrowser());
+    RegisterEditor(new EditorProjectBrowser());
+    RegisterEditor(new EditorGameView());
 }
 
 EditorManager::~EditorManager()
@@ -35,7 +39,7 @@ EditorManager::~EditorManager()
     m_RegisteredEditors.clear();
 }
 
-void EditorManager::DrawEditorsInternal()
+void EditorManager::DrawEditors()
 {
     ImGui::Begin("All editors");
 
@@ -54,11 +58,11 @@ void EditorManager::DrawEditorsInternal()
         }        
     }    
 
-    //bool test = true;
-    //ImGui::ShowDemoWindow(&test);
+    bool test = true;
+    ImGui::ShowDemoWindow(&test);
 }
 
-void EditorManager::RegisterEditorInternal(EditorBase* editorPtr)
+void EditorManager::RegisterEditor(EditorBase* editorPtr)
 {
     auto it = std::find(m_RegisteredEditors.begin(), m_RegisteredEditors.end(), editorPtr);
 

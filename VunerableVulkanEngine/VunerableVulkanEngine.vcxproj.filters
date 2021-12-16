@@ -295,6 +295,9 @@
     <ClInclude Include="ECS\JsonSerialize.h">
       <Filter>ECS</Filter>
     </ClInclude>
+    <ClInclude Include="GameCore\GameCoreComponentClasses.h">
+      <Filter>GameCore</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="IMGUI\imgui.cpp">
