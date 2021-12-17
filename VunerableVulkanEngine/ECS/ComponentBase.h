@@ -13,8 +13,6 @@
 
 namespace ECS
 {
-	typedef rapidjson::GenericObject<false, rapidjson::GenericValue<rapidjson::UTF8<>>> RapidJsonObject;
-
 	struct ComponentBase
 	{
 	public:
@@ -32,8 +30,8 @@ namespace ECS
 		void (*FuncRemoveComponentFromArray)(void* componentVectorPtr, uint32_t index);
 		void* (*FuncGetComponentFromArray)(void* componentVectorPtr, uint32_t index);
 		void (*FuncSetComponentToArray)(void* componentVectorPtr, uint32_t index, void* componentDataPtr);
-		void (*FuncDeserializeComponent)(RapidJsonObject& jsonEntityObject, const Entity& newEntity);
-		void (*FuncSerializeComponent)(RapidJsonObject& jsonEntityObject, const Entity& newEntity);
+		void (*FuncDeserializeComponent)(rapidjson::Value& jsonValue, const Entity& newEntity);
+		void (*FuncSerializeComponent)(rapidjson::Value& jsonValue, const Entity& newEntity);
 
 		bool operator==(const std::type_index& typeIndex)
 		{
@@ -61,8 +59,8 @@ namespace ECS
 		static uint32_t FindComponentIndex();
 
 		static ComponentTypeInfo& GetComponentTypeInfo(uint32_t componentIndex);
-		static void JsonDeserializeComponent(RapidJsonObject& entityObject, const Entity& newEntity, uint32_t componentIndex);
-		static void JsonSerializeComponent(RapidJsonObject& entityObject, const Entity& newEntity, uint32_t componentIndex);
+		static void JsonDeserializeComponent(rapidjson::Value& jsonValue, const Entity& newEntity, uint32_t componentIndex);
+		static void JsonSerializeComponent(rapidjson::Value& jsonValue, const Entity& newEntity, uint32_t componentIndex);
 
 	private:
 		static std::vector<ComponentTypeInfo> s_TypeInfoArray;

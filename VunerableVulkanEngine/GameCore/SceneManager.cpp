@@ -1,6 +1,7 @@
 #include "SceneManager.h"
 #include "ProjectManager.h"
 #include <fstream>
+#include <filesystem>
 #include "../ECS/Domain.h"
 #include "../ECS/JsonDeserialize.h"
 #include "../ECS/JsonSerialize.h"
@@ -21,6 +22,14 @@ namespace GameCore
 	bool SceneManager::LoadRecentlyModifiedScene()
 	{
 		return LoadScene(ProjectManager::GetInstance().GetCurrentScenePath());
+	}
+
+	bool SceneManager::LoadEmptyScene()
+	{
+		ECS::Domain::Terminate();
+		ECS::ComponentTypeUtility::RegisterComponentType<TransformComponent>();
+
+		return true;
 	}
 
 	bool SceneManager::LoadScene(const std::string& strScenePath)
@@ -84,6 +93,25 @@ namespace GameCore
 		return true;
 	}
 
+	bool SceneManager::SaveScene(const std::string& strScenePath)
+	{
+		if (!ProjectManager::GetInstance().IsProperScenePath(strScenePath))
+		{
+			return false;
+		}
+
+		std::ofstream fout(strScenePath.c_str());
+
+		if (!fout.is_open())
+		{
+			return false;
+		}
+
+		fout.close();
+
+		return true;
+	}
+
 	bool SceneManager::SaveCurrentScene()
 	{
 		rapidjson::Document jsonDoc(rapidjson::kObjectType);
@@ -94,14 +122,14 @@ namespace GameCore
 		uint32_t i = 0;
 
 		ECS::Domain::ForEach([&](ECS::ComponentArrayChunk* chunkPtr) {
-			auto& jsonValue = jsonChunkArray[i].SetObject();
-			auto jsonObject = jsonValue.GetObject();
-			ECS::JsonSerizlieChunk(jsonObject, allocator, chunkPtr);
+			auto jsonValue = rapidjson::Value();
+			jsonValue.SetObject();
+			ECS::JsonSerizlieChunk(jsonValue, allocator, chunkPtr);
+			jsonChunkArray.PushBack(jsonValue, allocator);
 			++i;
 		});
 		
 		std::string strScenePath = ProjectManager::GetInstance().GetCurrentScenePath();
-		std::string strResourcePath = ProjectManager::GetInstance().GetResourcePath(strScenePath);
 		rapidjson::StringBuffer strBuffer;
 		rapidjson::PrettyWriter<rapidjson::StringBuffer> prettyWriter(strBuffer);
 		jsonDoc.Accept(prettyWriter);
@@ -109,7 +137,7 @@ namespace GameCore
 		std::string strJson = strBuffer.GetString();
 
 		{
-			std::ofstream fout(strResourcePath.c_str());
+			std::ofstream fout(strScenePath.c_str());
 
 			if (!fout.is_open())
 			{

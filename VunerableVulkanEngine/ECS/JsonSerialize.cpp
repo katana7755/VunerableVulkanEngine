@@ -4,28 +4,32 @@
 #include "ComponentBase.h"
 #include <string>
 #include <cassert>
+#include "../rapidjson/stringbuffer.h"
+#include "../rapidjson/encodings.h"
 
 namespace ECS
 {
-	void JsonSerizlieChunk(RapidJsonObject& jsonObject, RapidJsonAllocator& allocator, ECS::ComponentArrayChunk* chunkPtr)
+	std::string g_StrBuffer;
+
+	void JsonSerizlieChunk(rapidjson::Value& jsonValue, RapidJsonAllocator& allocator, ECS::ComponentArrayChunk* chunkPtr)
 	{
 		assert(chunkPtr != NULL);
 
 		auto componentTypesKey = chunkPtr->m_ComponentTypesKey;
-		std::string strBuffer = componentTypesKey.to_string();
-		jsonObject.AddMember("m_BitField", rapidjson::Value().SetString(strBuffer.c_str(), strBuffer.size()), allocator);
+		g_StrBuffer = componentTypesKey.to_string();
+		jsonValue.AddMember("m_BitField", rapidjson::Value().SetString(g_StrBuffer.c_str(), g_StrBuffer.size()), allocator);
 
 		auto& entityArray = chunkPtr->m_EntityArray;
-		jsonObject.AddMember("m_EntityArray", rapidjson::Value().SetArray(), allocator);
+		jsonValue.AddMember("m_EntityArray", rapidjson::Value().SetArray(), allocator);
 
-		auto& jsonEntityArray = jsonObject["m_EntityArray"].SetArray();
+		auto& jsonEntityArray = jsonValue["m_EntityArray"].SetArray();
 
 		for (uint32_t i = 0; i < entityArray.size(); ++i)
 		{
 			auto& entity = entityArray[i];
-			auto& jsonEntityObject = jsonEntityArray[i].SetObject();
-			auto entityObject = jsonEntityObject.GetObject();
-			entityObject.AddMember("m_Identifier", rapidjson::Value().SetUint(entity.m_Identifier), allocator);
+			auto newJsonValue = rapidjson::Value();
+			newJsonValue.SetObject();
+			newJsonValue.AddMember("m_Identifier", rapidjson::Value().SetUint(entity.m_Identifier), allocator);
 
 			int componentCount = componentTypesKey.count();
 
@@ -37,8 +41,10 @@ namespace ECS
 				}
 
 				--componentCount;
-				ComponentTypeUtility::JsonSerializeComponent(entityObject, entity, componentIndex);
+				ComponentTypeUtility::JsonSerializeComponent(newJsonValue, entity, componentIndex);
 			}
+
+			jsonEntityArray.PushBack(newJsonValue, allocator);
 		}
 	}
 }

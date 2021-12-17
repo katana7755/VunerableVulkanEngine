@@ -11,7 +11,9 @@ namespace GameCore
 
 	public:
 		bool LoadRecentlyModifiedScene();
+		bool LoadEmptyScene();
 		bool LoadScene(const std::string& strScenePath);
+		bool SaveScene(const std::string& strScenePath);
 		bool SaveCurrentScene();
 	};
 }

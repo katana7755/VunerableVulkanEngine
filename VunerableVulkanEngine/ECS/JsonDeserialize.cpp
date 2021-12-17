@@ -6,13 +6,13 @@
 
 namespace ECS
 {
-	void JsonDeserizlieChunk(RapidJsonObject& jsonObject)
+	void JsonDeserizlieChunk(rapidjson::Value& jsonValue)
 	{
-		assert(jsonObject["m_BitField"].IsString());
-		assert(jsonObject["m_EntityArray"].IsArray());
+		assert(jsonValue["m_BitField"].IsString());
+		assert(jsonValue["m_EntityArray"].IsArray());
 
-		auto componentTypesKey = ECS::ComponentTypesKey(jsonObject["m_BitField"].GetString());
-		auto entityObjectArray = jsonObject["m_EntityArray"].GetArray();
+		auto componentTypesKey = ECS::ComponentTypesKey(jsonValue["m_BitField"].GetString());
+		auto entityObjectArray = jsonValue["m_EntityArray"].GetArray();
 
 		for (uint32_t i = 0; i < entityObjectArray.Size(); ++i)
 		{

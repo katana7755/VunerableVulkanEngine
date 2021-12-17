@@ -88,6 +88,7 @@ namespace GameCore
 
 		fout << strProjectPath << std::endl;
 		fout.close();
+		m_CurrentProjectPath = strProjectPath;
 
 		return true;
 	}
@@ -95,6 +96,8 @@ namespace GameCore
 	bool ProjectManager::LoadProject(const std::string& strProjectPath)
 	{
 		std::string strPath = ToProperPath(strProjectPath);
+		SaveRecentlyModifiedProject(strPath);
+
 		std::string strProjectFilePath = strPath + "/ProjectSettings.json";
 		std::string strJson;
 		std::ifstream fin(strProjectFilePath.c_str());
@@ -104,8 +107,28 @@ namespace GameCore
 			return false;
 		}
 
+		for (std::string strBuffer; std::getline(fin, strBuffer);)
+		{
+			strJson += strBuffer;
+		}
+
 		fin.close();
-		SaveRecentlyModifiedProject(strPath);
+
+		rapidjson::Document jsonDoc;
+		jsonDoc.Parse(strJson.c_str());
+
+		if (!jsonDoc.HasMember("m_CurrentProjectPath"))
+		{
+			return false;
+		}
+
+		if (!jsonDoc.HasMember("m_CurrentScenePath"))
+		{
+			return false;
+		}
+
+		m_CurrentProjectPath = jsonDoc["m_CurrentProjectPath"].GetString();
+		m_CurrentScenePath = jsonDoc["m_CurrentScenePath"].GetString();
 
 		return true;
 	}
@@ -119,32 +142,22 @@ namespace GameCore
 			return false;
 		}
 
-		rapidjson::Document jsonDoc(rapidjson::kObjectType);
-		auto& allocator = jsonDoc.GetAllocator();
-		jsonDoc.AddMember("m_CurrentProjectPath", rapidjson::Value().SetString(strPath.c_str(), strPath.length()), allocator);
-		jsonDoc.AddMember("m_CurrentScenePath", rapidjson::Value().SetString("", 0), allocator);
-
-		std::string strProjectFilePath = strPath + "/ProjectSettings.json";
-		std::ofstream fout(strProjectFilePath.c_str());
-
-		if (!fout.is_open())
+		if (!SaveRecentlyModifiedProject(strPath))
 		{
 			return false;
 		}
 
-		rapidjson::StringBuffer strBuffer;
-		rapidjson::PrettyWriter<rapidjson::StringBuffer> prettyWriter(strBuffer);
-		jsonDoc.Accept(prettyWriter);
-		fout.write(strBuffer.GetString(), strBuffer.GetSize());
-		fout.close();
-		SaveRecentlyModifiedProject(strPath);
+		if (!SaveCurrentProjectSettings())
+		{
+			return false;
+		}
 
 		return true;
 	}
 
 	std::string ProjectManager::GetCurrentScenePath()
 	{
-		return m_CurrentScenePath;
+		return GetResourcePath(m_CurrentScenePath);
 	}
 
 	std::string ProjectManager::GetResourcePath(const std::string& strResourcePath)
@@ -154,16 +167,57 @@ namespace GameCore
 
 	bool ProjectManager::SetCurrentScenePath(const std::string& strScenePath, std::string& strOutPath)
 	{
+		if (!IsProperScenePath(strScenePath))
+		{
+			return false;
+		}
+
 		std::string strPath = ToProperPath(strScenePath);
-		std::filesystem::path fPath(GetResourcePath(strPath));
+		std::filesystem::path fPath(strPath);
 
 		if (!std::filesystem::exists(fPath))
 		{
 			return false;
 		}
 
+		size_t findIndex = strPath.find(m_CurrentProjectPath);
+		strPath = strPath.replace(strPath.begin() + findIndex, strPath.begin() + findIndex + m_CurrentProjectPath.size(), "");
+		findIndex = 0;
+
+		while (strPath.at(findIndex) == '/')
+		{
+			++findIndex;
+		}
+
+		if (findIndex > 0)
+		{
+			strPath = strPath.substr(findIndex, strPath.size() - findIndex);
+		}
+
 		m_CurrentScenePath = strPath;
 		strOutPath = strPath;
+
+		return true;
+	}
+
+	bool ProjectManager::IsCurrentSceneOpen()
+	{
+		return IsProperScenePath(GetCurrentScenePath());
+	}
+
+	bool ProjectManager::IsProperScenePath(const std::string& strScenePath)
+	{
+		if (strScenePath.find(".scene") != strScenePath.size() - 6)
+		{
+			return false;
+		}
+
+		std::string strPath = ToProperPath(strScenePath);
+
+		if (strPath.find(m_CurrentProjectPath) >= strPath.size())
+		{
+			return false;
+		}
 
 		return true;
 	}
@@ -214,5 +268,29 @@ namespace GameCore
 		}
 
 		return strPath;
+	}
+
+	bool ProjectManager::SaveCurrentProjectSettings()
+	{
+		rapidjson::Document jsonDoc(rapidjson::kObjectType);
+		auto& allocator = jsonDoc.GetAllocator();
+		jsonDoc.AddMember("m_CurrentProjectPath", rapidjson::Value().SetString(m_CurrentProjectPath.c_str(), m_CurrentProjectPath.size()), allocator);
+		jsonDoc.AddMember("m_CurrentScenePath", rapidjson::Value().SetString(m_CurrentScenePath.c_str(), m_CurrentScenePath.size()), allocator);
+
+		std::string strProjectFilePath = m_CurrentProjectPath + "/ProjectSettings.json";
+		std::ofstream fout(strProjectFilePath.c_str());
+
+		if (!fout.is_open())
+		{
+			return false;
+		}
+
+		rapidjson::StringBuffer strBuffer;
+		rapidjson::PrettyWriter<rapidjson::StringBuffer> prettyWriter(strBuffer);
+		jsonDoc.Accept(prettyWriter);
+		fout.write(strBuffer.GetString(), strBuffer.GetSize());
+		fout.close();
+
+		return true;
 	}
 }

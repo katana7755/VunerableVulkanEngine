@@ -21,15 +21,15 @@ namespace ECS
 		return s_TypeInfoArray.size();
 	}
 
-	void ComponentTypeUtility::JsonDeserializeComponent(RapidJsonObject& jsonEntityObject, const Entity& newEntity, uint32_t componentIndex)
+	void ComponentTypeUtility::JsonDeserializeComponent(rapidjson::Value& jsonValue, const Entity& newEntity, uint32_t componentIndex)
 	{
 		auto& typeInfo = GetComponentTypeInfo(componentIndex);
-		typeInfo.FuncDeserializeComponent(jsonEntityObject, newEntity);
+		typeInfo.FuncDeserializeComponent(jsonValue, newEntity);
 	}
 
-	void ComponentTypeUtility::JsonSerializeComponent(RapidJsonObject& jsonEntityObject, const Entity& newEntity, uint32_t componentIndex)
+	void ComponentTypeUtility::JsonSerializeComponent(rapidjson::Value& jsonValue, const Entity& newEntity, uint32_t componentIndex)
 	{
 		auto& typeInfo = GetComponentTypeInfo(componentIndex);
-		typeInfo.FuncSerializeComponent(jsonEntityObject, newEntity);
+		typeInfo.FuncSerializeComponent(jsonValue, newEntity);
 	}
 }

@@ -18,6 +18,9 @@ namespace GameCore
 		std::string GetResourcePath(const std::string& strResourcePath);
 		std::string GetCurrentScenePath();
 		bool SetCurrentScenePath(const std::string& strScenePath, std::string& strOutPath);
+		bool IsCurrentSceneOpen();
+		bool IsProperScenePath(const std::string& strScenePath);
+		bool SaveCurrentProjectSettings();
 
 	private:
 		bool IsProperNewProjectPath(const std::string& strProjectPath);

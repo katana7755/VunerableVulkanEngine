@@ -116,6 +116,7 @@ namespace ECS
 		static const ComponentTypesKey& GetComponentTypesKey(const Entity& entity);
 		static void CreateChunk(const ComponentTypesKey& componentTypesKey);
 		static void DestroyChunk(const ComponentTypesKey& componentTypesKey);
+		static uint32_t GetChunkCount();
 		static Entity CreateEntity(const ComponentTypesKey& componentTypesKey, uint32_t identifier = Entity::INVALID_IDENTIFIER);
 		static void DestroyEntity(const Entity& entity);
 

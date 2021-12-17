@@ -5,7 +5,5 @@
 
 namespace ECS
 {
-	typedef rapidjson::GenericObject<false, rapidjson::GenericValue<rapidjson::UTF8<>>> RapidJsonObject;
-
-	void JsonDeserizlieChunk(RapidJsonObject& jsonObject);
+	void JsonDeserizlieChunk(rapidjson::Value& jsonValue);
 }

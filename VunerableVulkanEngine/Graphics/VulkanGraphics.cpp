@@ -2,15 +2,21 @@
 
 #include <stdio.h>
 #include "VulkanGraphics.h"
-#include "vulkan/vulkan_win32.h" // TODO: need to consider other platfroms such as Android, Linux etc... in the future
 #include "../DebugUtility.h"
 #include "glm/gtc/matrix_transform.hpp"
 
+#ifdef _WIN32
+#include "vulkan/vulkan_win32.h" // TODO: need to consider other platfroms such as Android, Linux etc... in the future
+#endif
+
 #include "../IMGUI/imgui.h"
-#include "../IMGUI/imgui_impl_win32.h"
 #include "../IMGUI/imgui_impl_vulkan.h"
 #include "../Editor/EditorGameView.h"
 #include "../Editor/EditorManager.h"
+
+#ifdef _WIN32
+#include "../IMGUI/imgui_impl_win32.h"
+#endif
 
 #include "VulkanGraphicsResourceInstance.h"
 #include "VulkanGraphicsResourceSurface.h"

@@ -7,7 +7,7 @@
 #include "IMGUI/imgui_impl_win32.h"
 #include "GameCore/ProjectManager.h"
 #include "GameCore/SceneManager.h"
-#include <shlobj.h>
+#include "Editor/EditorManager.h"
 
 #define MAX_LOADSTRING 100
 
@@ -35,34 +35,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     // TODO: Place code here.
     if (GameCore::ProjectManager::GetInstance().LoadRecentlyModifiedProject())
     {
-        GameCore::SceneManager::GetInstance().LoadRecentlyModifiedScene();
+        if (!GameCore::SceneManager::GetInstance().LoadRecentlyModifiedScene())
+        {
+            GameCore::SceneManager::GetInstance().LoadEmptyScene();
+        }
     }
     else
     {
-        CHAR szBuffer[MAX_PATH] = { 0, };
-        auto info = BROWSEINFO{ 0 };
-        info.lpszTitle = "Select project folder";
-        info.pszDisplayName = szBuffer;
-        info.ulFlags = BIF_EDITBOX | BIF_NEWDIALOGSTYLE;
-
-        while (true)
-        {
-            auto idl = SHBrowseForFolder(&info);
-
-            if (idl == 0)
-            {
-                return FALSE;
-            }
-
-            SHGetPathFromIDList(idl, szBuffer);
-
-            if (!GameCore::ProjectManager::GetInstance().CreateProject(szBuffer))
-            {
-                continue;
-            }
-
-            break;
-        }
+        EditorManager::GetInstance().TryToCreateNewProject();
     }
 
     // Initialize global strings
@@ -117,7 +97,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_VUNERABLEVULKANENGINE));
     wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
     wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
-    wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_VUNERABLEVULKANENGINE);
+    wcex.lpszMenuName   = NULL;
     wcex.lpszClassName  = szWindowClass;
     wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
 
@@ -138,8 +118,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    hInst = hInstance; // Store instance handle in our global variable
 
-   HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
+   HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
 
    if (!hWnd)
    {
@@ -174,23 +153,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     switch (message)
     {
-    case WM_COMMAND:
-        {
-            int wmId = LOWORD(wParam);
-            // Parse the menu selections:
-            switch (wmId)
-            {
-            case IDM_ABOUT:
-                DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
-                break;
-            case IDM_EXIT:
-                DestroyWindow(hWnd);
-                break;
-            default:
-                return DefWindowProc(hWnd, message, wParam, lParam);
-            }
-        }
-        break;
     case WM_PAINT:
         {
             PAINTSTRUCT ps;

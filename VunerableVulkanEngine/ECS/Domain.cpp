@@ -47,6 +47,11 @@ namespace ECS
 		s_KeyToChunkPtrMap.erase(chunkPtrIter);
 	}
 
+	uint32_t Domain::GetChunkCount()
+	{
+		return s_KeyToChunkPtrMap.size();
+	}
+
 	Entity Domain::CreateEntity(const ComponentTypesKey& componentTypesKey, uint32_t identifier)
 	{
 		assert(componentTypesKey.count() <= ECS_MAX_COMPONENTARRAY_COUNT_IN_CHUNK);
