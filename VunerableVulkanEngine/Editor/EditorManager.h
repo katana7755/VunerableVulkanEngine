@@ -44,6 +44,7 @@ private:
 	void ExecuteMenuCreatingNewProject();
 	void ExecuteMenuLoadingProject();
 	void ExecuteMenuSavingProject();
+	void ExecuteMenuExitingApplication();
 
 #if _WIN32
 	std::string ToWindowsCOMPath(const std::string& strInput);

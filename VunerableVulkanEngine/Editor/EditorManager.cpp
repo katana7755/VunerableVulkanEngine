@@ -9,7 +9,6 @@
 #include "../GameCore/SceneManager.h"
 
 #ifdef _WIN32
-#include <shlobj.h>
 #include <ShObjIdl.h>
 #endif
 
@@ -87,29 +86,76 @@ void EditorManager::RegisterEditor(EditorBase* editorPtr)
 void EditorManager::TryToCreateNewProject()
 {
 #ifdef _WIN32
-    CHAR szBuffer[MAX_PATH] = { 0, };
-    auto info = BROWSEINFO{ 0 };
-    info.lpszTitle = "Select project folder";
-    info.pszDisplayName = szBuffer;
-    info.ulFlags = BIF_EDITBOX | BIF_NEWDIALOGSTYLE;
-
     while (true)
     {
-        auto idl = SHBrowseForFolder(&info);
-
-        if (idl == 0)
+        if (!SUCCEEDED(CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE)))
         {
             continue;
         }
 
-        SHGetPathFromIDList(idl, szBuffer);
+        IFileOpenDialog* pFileDialog;
 
-        if (!GameCore::ProjectManager::GetInstance().CreateProject(szBuffer))
+        if (!SUCCEEDED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_ALL, IID_IFileOpenDialog, (LPVOID*)&pFileDialog)))
         {
+            CoUninitialize();
+
             continue;
         }
 
-        break;
+        auto strPath = GameCore::ProjectManager::GetInstance().GetResourcePath("");
+        strPath = ToWindowsCOMPath(strPath);
+        IShellItem* pFolder;
+        WCHAR szBuffer[MAX_PATH];
+        mbstowcs(szBuffer, strPath.c_str(), MAX_PATH);
+        auto result = SHCreateItemFromParsingName(szBuffer, NULL, IID_PPV_ARGS(&pFolder));
+
+        if (!SUCCEEDED(result))
+        {
+            CoUninitialize();
+
+            continue;
+        }
+
+        pFileDialog->SetDefaultFolder(pFolder);
+
+        DWORD options;
+        pFileDialog->GetOptions(&options);
+        pFileDialog->SetOptions(options | FOS_PICKFOLDERS);
+
+        if (!SUCCEEDED(pFileDialog->Show(NULL)))
+        {
+            CoUninitialize();
+
+            break;
+        }
+
+        IShellItem* pItem;
+
+        if (!SUCCEEDED(pFileDialog->GetResult(&pItem)))
+        {
+            CoUninitialize();
+
+            continue;
+        }
+
+        PWSTR pszFilePath;
+
+        if (!SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath)))
+        {
+            CoUninitialize();
+
+            continue;
+        }
+
+        CHAR chBuffer[MAX_PATH];
+        wcstombs(chBuffer, pszFilePath, MAX_PATH);
+
+        std::string strFilePath = chBuffer;
+
+        if (GameCore::ProjectManager::GetInstance().CreateProject(strFilePath))
+        {
+            break;
+        }
     }
 #endif
 }
@@ -135,6 +181,13 @@ void EditorManager::DrawMainMenu()
                 ExecuteMenuSavingProject();
             }
 
+            ImGui::Separator();
+
+            if (ImGui::MenuItem("Exit"))
+            {
+                ExecuteMenuExitingApplication();
+            }
+
             ImGui::EndMenu();
         }
 
@@ -145,35 +198,82 @@ void EditorManager::DrawMainMenu()
 void EditorManager::ExecuteMenuCreatingNewProject()
 {
     TryToCreateNewProject();
-    GameCore::SceneManager::GetInstance().LoadRecentlyModifiedScene();
+    GameCore::SceneManager::GetInstance().LoadEmptyScene();
 }
 
 void EditorManager::ExecuteMenuLoadingProject()
 {
 #ifdef _WIN32
-    CHAR szBuffer[MAX_PATH] = { 0, };
-    auto info = BROWSEINFO{ 0 };
-    info.lpszTitle = "Select project folder";
-    info.pszDisplayName = szBuffer;
-    info.ulFlags = BIF_EDITBOX | BIF_NEWDIALOGSTYLE;
-
     while (true)
     {
-        auto idl = SHBrowseForFolder(&info);
-
-        if (idl == 0)
+        if (!SUCCEEDED(CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE)))
         {
             continue;
         }
 
-        SHGetPathFromIDList(idl, szBuffer);
+        IFileOpenDialog* pFileDialog;
 
-        if (!GameCore::ProjectManager::GetInstance().LoadProject(szBuffer))
+        if (!SUCCEEDED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_ALL, IID_IFileOpenDialog, (LPVOID*)&pFileDialog)))
         {
+            CoUninitialize();
+
             continue;
         }
 
-        break;
+        auto strPath = GameCore::ProjectManager::GetInstance().GetResourcePath("");
+        strPath = ToWindowsCOMPath(strPath);
+        IShellItem* pFolder;
+        WCHAR szBuffer[MAX_PATH];
+        mbstowcs(szBuffer, strPath.c_str(), MAX_PATH);
+        auto result = SHCreateItemFromParsingName(szBuffer, NULL, IID_PPV_ARGS(&pFolder));
+
+        if (!SUCCEEDED(result))
+        {
+            CoUninitialize();
+
+            continue;
+        }
+
+        pFileDialog->SetDefaultFolder(pFolder);
+
+        DWORD options;
+        pFileDialog->GetOptions(&options);
+        pFileDialog->SetOptions(options | FOS_PICKFOLDERS);
+
+        if (!SUCCEEDED(pFileDialog->Show(NULL)))
+        {
+            CoUninitialize();
+
+            break;
+        }
+
+        IShellItem* pItem;
+
+        if (!SUCCEEDED(pFileDialog->GetResult(&pItem)))
+        {
+            CoUninitialize();
+
+            continue;
+        }
+
+        PWSTR pszFilePath;
+
+        if (!SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath)))
+        {
+            CoUninitialize();
+
+            continue;
+        }
+
+        CHAR chBuffer[MAX_PATH];
+        wcstombs(chBuffer, pszFilePath, MAX_PATH);
+
+        std::string strFilePath = chBuffer;
+
+        if (GameCore::ProjectManager::GetInstance().LoadProject(strFilePath))
+        {
+            break;
+        }
     }
 #endif
 
@@ -195,6 +295,7 @@ void EditorManager::ExecuteMenuSavingProject()
         if (!SUCCEEDED(CoCreateInstance(CLSID_FileSaveDialog, NULL, CLSCTX_ALL, IID_IFileSaveDialog, (LPVOID*)&pFileDialog)))
         {
             CoUninitialize();
+
             continue;
         }
 
@@ -207,6 +308,8 @@ void EditorManager::ExecuteMenuSavingProject()
 
         if (!SUCCEEDED(result))
         {
+            CoUninitialize();
+
             continue;
         }
 
@@ -219,21 +322,23 @@ void EditorManager::ExecuteMenuSavingProject()
 
         pFileDialog->SetFileTypes(1, fileTypes);
 
-        if (!SUCCEEDED(pFileDialog->Show(NULL)))
-        {
-            CoUninitialize();
-            continue;
-        }
-
         DWORD options;
         pFileDialog->GetOptions(&options);
         pFileDialog->SetOptions(options | FOS_OVERWRITEPROMPT | FOS_NOREADONLYRETURN | FOS_PATHMUSTEXIST | FOS_NOCHANGEDIR);
+
+        if (!SUCCEEDED(pFileDialog->Show(NULL)))
+        {
+            CoUninitialize();
+
+            break;
+        }
 
         IShellItem* pItem;
 
         if (!SUCCEEDED(pFileDialog->GetResult(&pItem)))
         {
             CoUninitialize();
+
             continue;
         }
 
@@ -242,6 +347,7 @@ void EditorManager::ExecuteMenuSavingProject()
         if (!SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath)))
         {
             CoUninitialize();
+
             continue;
         }
 
@@ -261,13 +367,16 @@ void EditorManager::ExecuteMenuSavingProject()
         {
             GameCore::ProjectManager::GetInstance().SetCurrentScenePath(strFilePath, strScenePath);
         }        
-        
-        printf_console("***** result display name -----> %s, %s\n", strFilePath.c_str(), strScenePath.c_str());
     }
 #endif
 
     GameCore::SceneManager::GetInstance().SaveCurrentScene();
     GameCore::ProjectManager::GetInstance().SaveCurrentProjectSettings();
+}
+
+void EditorManager::ExecuteMenuExitingApplication()
+{
+    exit(0);
 }
 
 #if _WIN32
