@@ -54,7 +54,7 @@ bool VulkanGraphicsResourceSwapchain::CreateSwapchain()
 {
 	DestroySwapchain();
 
-	uint32_t imageCount = VulkanGraphicsResourceDevice::GetInstance().GetSurfaceCapabilities().minImageCount + 1;
+	uint32_t imageCount = VulkanGraphicsResourceDevice::GetInstance().GetSurfaceCapabilities(true).minImageCount + 1;
 
 	if (imageCount > VulkanGraphicsResourceDevice::GetInstance().GetSurfaceCapabilities().maxImageCount)
 	{
@@ -111,7 +111,14 @@ bool VulkanGraphicsResourceSwapchain::CreateSwapchain()
 
 bool VulkanGraphicsResourceSwapchain::DestroySwapchain()
 {
+	if (m_Swapchain == VK_NULL_HANDLE)
+	{
+		return true;
+	}
+
 	vkDestroySwapchainKHR(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_Swapchain, NULL);
+	m_Swapchain = VK_NULL_HANDLE;
+
 	return true;
 }
 
@@ -166,7 +173,7 @@ bool VulkanGraphicsResourceSwapchain::DestroyImageViews()
 
 	for (int i = 0; i < m_ImageViewArray.size(); ++i)
 	{
-		vkDestroyImageView(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_ImageViewArray[0], NULL);
+		vkDestroyImageView(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice(), m_ImageViewArray[i], NULL);
 	}
 
 	m_IsImageViewArrayCreated = false;

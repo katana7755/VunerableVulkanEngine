@@ -1,5 +1,6 @@
 #pragma once
 #include "VulkanGraphicsResourceBase.h"
+#include "VulkanGraphicsResourceSurface.h"
 #include <vector>
 #include <unordered_map>
 
@@ -54,8 +55,13 @@ public:
 		return m_PhysicalDeviceProperties;
 	}
 
-	const VkSurfaceCapabilitiesKHR& GetSurfaceCapabilities()
+	const VkSurfaceCapabilitiesKHR& GetSurfaceCapabilities(bool updateCache = false)
 	{
+		if (updateCache)
+		{
+			vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysicalDeviceArray[m_PhysicalDeviceIndex], VulkanGraphicsResourceSurface::GetInstance().GetSurface(), &m_SurfaceCapabilities);
+		}
+		
 		return m_SurfaceCapabilities;
 	}
 

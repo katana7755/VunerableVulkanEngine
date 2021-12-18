@@ -122,6 +122,8 @@ VulkanGraphics::~VulkanGraphics()
 #ifdef _WIN32
 void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 {
+	m_HWnd = hWnd;
+
 	VulkanGraphicsResourceSurface::GetInstance().Setup(hInstance, hWnd);
 	VulkanGraphicsResourceSurface::GetInstance().Create();
 	VulkanGraphicsResourceDevice::GetInstance().Create();
@@ -143,12 +145,17 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 	VulnerableLayer::Initialize();
 
 	BuildRenderLoop();
-	InitializeGUI(hWnd);
+	InitializeGUI();
 }
 #endif
 
 void VulkanGraphics::Invalidate()
 {
+	vkDeviceWaitIdle(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice());
+
+	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::DestroyCommandBuffer>([&](auto* commandPtr) {
+		commandPtr->m_Identifier = m_RenderingCommandBufferIdentifier;
+		});
 	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::DestroyGraphicsPipeline>([&](auto* commandPtr) {
 		commandPtr->m_Identifier = m_PipelineIdentifier;
 		});
@@ -159,6 +166,40 @@ void VulkanGraphics::Invalidate()
 		commandPtr->m_Identifier = m_fragmentShaderIdentifier;
 		});
 	VulnerableLayer::ExecuteAllCommands();
+
+	m_RenderingCommandBufferIdentifier = (size_t)-1;
+	DeinitializeGUI();
+	EditorGameView::SetTexture(NULL, NULL);
+
+	if (m_DescriptorSetIdentifier != -1)
+	{
+		VulkanGraphicsResourceDescriptorSetManager::GetInstance().DestroyResource(m_DescriptorSetIdentifier);
+		VulkanGraphicsResourceDescriptorSetManager::GetInstance().ReleaseIdentifier(m_DescriptorSetIdentifier);
+		m_DescriptorSetIdentifier = -1;
+	}
+
+	if (m_DescriptorPoolIdentifier != -1)
+	{
+		VulkanGraphicsResourceDescriptorPoolManager::GetInstance().DestroyResource(m_DescriptorPoolIdentifier);
+		VulkanGraphicsResourceDescriptorPoolManager::GetInstance().ReleaseIdentifier(m_DescriptorPoolIdentifier);
+		m_DescriptorPoolIdentifier = -1;
+	}
+
+	for (size_t identifier : m_BackBufferIdentifierArray)
+	{
+		VulkanGraphicsResourceFrameBufferManager::GetInstance().DestroyResource(identifier);
+		VulkanGraphicsResourceFrameBufferManager::GetInstance().ReleaseIdentifier(identifier);
+	}
+
+	m_BackBufferIdentifierArray.clear();
+
+	for (size_t identifier : m_FrontBufferIdentifierArray)
+	{
+		VulkanGraphicsResourceFrameBufferManager::GetInstance().DestroyResource(identifier);
+		VulkanGraphicsResourceFrameBufferManager::GetInstance().ReleaseIdentifier(identifier);
+	}
+
+	m_FrontBufferIdentifierArray.clear();
 
 	if (m_DefaultRenderPassIdentifier != -1)
 	{
@@ -205,6 +246,7 @@ void VulkanGraphics::Invalidate()
 	m_MVPMatrixUniformBuffer.Create();
 
 	BuildRenderLoop();
+	InitializeGUI();
 }
 
 void VulkanGraphics::SubmitPrimary()
@@ -473,7 +515,7 @@ void VulkanGraphics::BuildRenderLoop()
 
 	if (m_RenderingCommandBufferIdentifier == (size_t)-1)
 	{
-		m_RenderingCommandBufferIdentifier = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().AllocateIdentifier();
+		m_RenderingCommandBufferIdentifier = VulkanGraphicsResourceCommandBufferManager::GetInstance().AllocateIdentifier();
 
 		VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateCommandBuffer>([&](auto* commandPtr) {
 			commandPtr->m_Identifier = m_RenderingCommandBufferIdentifier;
@@ -555,7 +597,7 @@ void VulkanGraphics::TransferAllStagingBuffers()
 		return;
 	}
 
-	size_t commandBufferIdentifier = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().AllocateIdentifier();
+	size_t commandBufferIdentifier = VulkanGraphicsResourceCommandBufferManager::GetInstance().AllocateIdentifier();
 	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateCommandBuffer>([&](auto* commandPtr) {
 		commandPtr->m_Identifier = commandBufferIdentifier;
 		commandPtr->m_InputData.m_CommandType = EVulkanCommandType::GRAPHICS; // graphics and compute queue both have transfer functionality, so it isn't necessary to use the specific transfer queue...
@@ -598,7 +640,7 @@ void VulkanGraphics::TransferAllStagingBuffers()
 }
 
 #ifdef _WIN32
-void VulkanGraphics::InitializeGUI(HWND hWnd)
+void VulkanGraphics::InitializeGUI()
 {
 	m_ImGuiRenderPassIdentifier = VulkanGraphicsResourceRenderPassManager::GetInstance().AllocateIdentifier();
 
@@ -705,7 +747,7 @@ void VulkanGraphics::InitializeGUI(HWND hWnd)
 
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	ImGui::StyleColorsDark();
-	ImGui_ImplWin32_Init(hWnd);
+	ImGui_ImplWin32_Init(m_HWnd);
 
 	ImGui_ImplVulkan_InitInfo init_info = {};
 	init_info.Instance = VulkanGraphicsResourceInstance::GetInstance().GetVkInstance();
@@ -750,7 +792,7 @@ void VulkanGraphics::DrawGUI(VkSemaphore& acquireNextImageSemaphore)
 	{
 		m_ImGuiFontUpdated = true;
 
-		size_t commandBufferIdentifier = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().AllocateIdentifier();
+		size_t commandBufferIdentifier = VulkanGraphicsResourceCommandBufferManager::GetInstance().AllocateIdentifier();
 		VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateCommandBuffer>([&](auto* commandPtr) {
 			commandPtr->m_Identifier = commandBufferIdentifier;
 			commandPtr->m_InputData.m_CommandType = EVulkanCommandType::GRAPHICS;
@@ -782,7 +824,7 @@ void VulkanGraphics::DrawGUI(VkSemaphore& acquireNextImageSemaphore)
 
 	if (!is_minimized)
 	{
-		size_t commandBufferIdentifier = VulkanGraphicsResourceGraphicsPipelineManager::GetInstance().AllocateIdentifier();
+		size_t commandBufferIdentifier = VulkanGraphicsResourceCommandBufferManager::GetInstance().AllocateIdentifier();
 		VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateCommandBuffer>([&](auto* commandPtr) {
 			commandPtr->m_Identifier = commandBufferIdentifier;
 			commandPtr->m_InputData.m_CommandType = EVulkanCommandType::GRAPHICS;

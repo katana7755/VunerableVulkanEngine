@@ -30,13 +30,17 @@ private:
 	void TransferAllStagingBuffers();
 
 #ifdef _WIN32
-	void InitializeGUI(HWND hWnd);
+	void InitializeGUI();
 #endif
 
 	void DeinitializeGUI();
 	void DrawGUI(VkSemaphore& acquireNextImageSemaphore);
 
 private:
+#ifdef _WIN32
+	HWND m_HWnd;
+#endif
+
 	VulkanGraphicsObjectMesh m_CharacterMesh;
 	VulkanGraphicsObjectTexture m_CharacterHeadTexture;
 	VulkanGraphicsObjectSampler m_CharacterHeadSampler;

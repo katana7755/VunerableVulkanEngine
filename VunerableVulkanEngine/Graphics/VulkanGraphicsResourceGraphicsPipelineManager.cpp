@@ -88,7 +88,7 @@ void VulkanGraphicsResourceGraphicsPipelineManager::DestroyResourcePhysicially(c
     {
         size_t identifier = outputData.m_DescriptorSetLayoutIdentifiers[i];
 
-        if (identifier == -1)
+        if (identifier == (size_t)-1)
         {
             continue;
         }

@@ -39,8 +39,8 @@ struct VulkanGraphicsPipelineOutputData
 
 	VulkanGraphicsPipelineOutputData()
 	{
-		memset(m_DescriptorSetLayoutIdentifiers, -1, EVulkanShaderType::MAX);
-		m_PipelineLayoutIdentifier = -1;
+		memset(m_DescriptorSetLayoutIdentifiers, (size_t)-1, sizeof(size_t) * EVulkanShaderType::MAX);
+		m_PipelineLayoutIdentifier = (size_t)-1;
 	}
 
 	VkPipelineBindPoint GetBindPoint()

@@ -271,13 +271,13 @@ public:
 	void BuildAll();
 	void SubmitAll(const std::vector<VkSemaphore>& additionalWaitSemaphoreArray);
 	VkSemaphore GetSemaphoreForSubmission();
+	void FreeAllQueueSubmitNodes();
 
 private:
 	void CreateSingleCommandPool(EVulkanCommandType::TYPE commandType, bool isTransient);
 	void DestroySingleCommandPool(EVulkanCommandType::TYPE commandType, bool isTransient);
 	void ReserveIndexForCommandBuffer(EVulkanCommandType::TYPE commandType, int index, std::unordered_map<EVulkanCommandType::TYPE, IndexArray>& resourceIndexArrayMap, size_t countArray[EVulkanCommandType::MAX]);
 	void AllocateAndRecordCommandBuffer(std::unordered_map<EVulkanCommandType::TYPE, IndexArray>& resourceIndexArrayMap, const size_t countArray[EVulkanCommandType::MAX]);
-	void FreeAllQueueSubmitNodes();
 
 private:
 	std::unordered_map<EVulkanCommandType::TYPE, VkCommandPool>	m_StaticCommandPoolMap;

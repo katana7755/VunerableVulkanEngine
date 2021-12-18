@@ -1,7 +1,6 @@
 #include "VulkanGraphicsResourceDevice.h"
 #include "../DebugUtility.h"
 #include "VulkanGraphicsResourceInstance.h"
-#include "VulkanGraphicsResourceSurface.h"
 #include <set>
 
 VulkanGraphicsResourceDevice g_Instance;
