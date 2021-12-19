@@ -27,9 +27,9 @@ namespace ECS
 		typeInfo.FuncDeserializeComponent(jsonValue, newEntity);
 	}
 
-	void ComponentTypeUtility::JsonSerializeComponent(rapidjson::Value& jsonValue, const Entity& newEntity, uint32_t componentIndex)
+	void ComponentTypeUtility::JsonSerializeComponent(rapidjson::Value& jsonValue, RapidJsonAllocator& allocator, const Entity& newEntity, uint32_t componentIndex)
 	{
 		auto& typeInfo = GetComponentTypeInfo(componentIndex);
-		typeInfo.FuncSerializeComponent(jsonValue, newEntity);
+		typeInfo.FuncSerializeComponent(jsonValue, allocator, newEntity);
 	}
 }

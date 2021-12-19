@@ -447,6 +447,9 @@
     <ClCompile Include="ECS\JsonSerialize.cpp">
       <Filter>ECS</Filter>
     </ClCompile>
+    <ClCompile Include="GameCore\GameCoreComponentClasses.cpp">
+      <Filter>GameCore</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="VunerableVulkanEngine.rc">

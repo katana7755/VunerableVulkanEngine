@@ -22,7 +22,7 @@ namespace ECS
 			assert(jsonEntityObject.IsObject());
 
 			auto entityObject = jsonEntityObject.GetObject();
-			assert(entityObject["m_Identifier"].IsUint());
+			assert(entityObject.HasMember("m_Identifier") && entityObject["m_Identifier"].IsUint());
 
 			uint32_t identifier = entityObject["m_Identifier"].GetUint();
 			auto newEntity = ECS::Domain::CreateEntity(componentTypesKey, identifier);

@@ -41,7 +41,7 @@ namespace ECS
 				}
 
 				--componentCount;
-				ComponentTypeUtility::JsonSerializeComponent(newJsonValue, entity, componentIndex);
+				ComponentTypeUtility::JsonSerializeComponent(newJsonValue, allocator, entity, componentIndex);
 			}
 
 			jsonEntityArray.PushBack(newJsonValue, allocator);

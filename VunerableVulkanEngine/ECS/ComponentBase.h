@@ -13,6 +13,8 @@
 
 namespace ECS
 {
+	typedef rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator> RapidJsonAllocator;
+
 	struct ComponentBase
 	{
 	public:
@@ -31,7 +33,7 @@ namespace ECS
 		void* (*FuncGetComponentFromArray)(void* componentVectorPtr, uint32_t index);
 		void (*FuncSetComponentToArray)(void* componentVectorPtr, uint32_t index, void* componentDataPtr);
 		void (*FuncDeserializeComponent)(rapidjson::Value& jsonValue, const Entity& newEntity);
-		void (*FuncSerializeComponent)(rapidjson::Value& jsonValue, const Entity& newEntity);
+		void (*FuncSerializeComponent)(rapidjson::Value& jsonValue, RapidJsonAllocator& allocator, const Entity& newEntity);
 
 		bool operator==(const std::type_index& typeIndex)
 		{
@@ -60,7 +62,7 @@ namespace ECS
 
 		static ComponentTypeInfo& GetComponentTypeInfo(uint32_t componentIndex);
 		static void JsonDeserializeComponent(rapidjson::Value& jsonValue, const Entity& newEntity, uint32_t componentIndex);
-		static void JsonSerializeComponent(rapidjson::Value& jsonValue, const Entity& newEntity, uint32_t componentIndex);
+		static void JsonSerializeComponent(rapidjson::Value& jsonValue, RapidJsonAllocator& allocator, const Entity& newEntity, uint32_t componentIndex);
 
 	private:
 		static std::vector<ComponentTypeInfo> s_TypeInfoArray;
