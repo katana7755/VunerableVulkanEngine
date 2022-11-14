@@ -9,7 +9,7 @@ namespace GameCore
 {
 	typedef rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator> RapidJsonAllocator;
 
-	struct TransformComponent : ECS::ComponentBase
+	struct TransformComponent : public ECS::ComponentBase
 	{
 	public:
 		uint32_t	m_Parent;
@@ -23,6 +23,18 @@ namespace GameCore
 			m_Position = glm::vec3(0.0f, 0.0f, 0.0f);
 			m_Rotation = glm::quat(glm::vec3(0.0f, 0.0f, 0.0f));
 			m_Scale = glm::vec3(1.0f, 1.0f, 1.0f);
+		}
+
+	public:
+		static void JsonDeserialize(rapidjson::Value& jsonValue, const ECS::Entity& entity);
+		static void JsonSerialize(rapidjson::Value& jsonValue, RapidJsonAllocator& allocator, const ECS::Entity& entity);
+	};
+
+	struct DummyRendererComponent : public ECS::ComponentBase
+	{
+	public:
+		DummyRendererComponent()
+		{
 		}
 
 	public:

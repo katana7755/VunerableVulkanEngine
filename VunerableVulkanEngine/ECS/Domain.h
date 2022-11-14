@@ -127,7 +127,7 @@ namespace ECS
 		static void SetComponent(const Entity& entity, const TComponentType& componentData);
 
 		template <class TSystemType>
-		static uint32_t CreateSystem(uint32_t priority);
+		static uint32_t RegisterSystem(uint32_t priority);
 
 		static void DestroySystem(uint32_t systemIdentifier);
 		static void ChangeSystemPriority(uint32_t systemIdentifier, uint32_t priority);
@@ -136,11 +136,9 @@ namespace ECS
 		template <typename FuncForEachEntity>
 		static void ForEach(const ComponentTypesKey& componentTypesKey, FuncForEachEntity funcForEachEntity)
 		{
-			int componentCount = componentTypesKey.count();
-
 			for (auto chunkPtrPair : s_KeyToChunkPtrMap)
 			{
-				if ((chunkPtrPair.first & componentTypesKey).count() != componentCount)
+				if ((chunkPtrPair.first & componentTypesKey) != componentTypesKey)
 				{
 					continue;
 				}
@@ -235,7 +233,7 @@ namespace ECS
 	}
 
 	template <class TSystemType>
-	uint32_t Domain::CreateSystem(uint32_t priority)
+	uint32_t Domain::RegisterSystem(uint32_t priority)
 	{
 		static_assert(std::is_base_of<SystemBase, TSystemType>::value, "this function should be called with a class derived by ECS::SystemBase.");
 

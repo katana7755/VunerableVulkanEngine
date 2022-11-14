@@ -298,6 +298,12 @@
     <ClInclude Include="GameCore\GameCoreComponentClasses.h">
       <Filter>GameCore</Filter>
     </ClInclude>
+    <ClInclude Include="Editor\EditorSelection.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="GameCore\GameCoreLoop.h">
+      <Filter>GameCore</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="IMGUI\imgui.cpp">
@@ -448,6 +454,12 @@
       <Filter>ECS</Filter>
     </ClCompile>
     <ClCompile Include="GameCore\GameCoreComponentClasses.cpp">
+      <Filter>GameCore</Filter>
+    </ClCompile>
+    <ClCompile Include="Editor\EditorSelection.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="GameCore\GameCoreLoop.cpp">
       <Filter>GameCore</Filter>
     </ClCompile>
   </ItemGroup>

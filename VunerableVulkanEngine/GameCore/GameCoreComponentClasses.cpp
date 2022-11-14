@@ -99,4 +99,21 @@ namespace GameCore
 
 		jsonValue.AddMember("TransformComponent", jsonComponentObject.GetObject(), allocator);
 	}
+
+	void DummyRendererComponent::JsonDeserialize(rapidjson::Value& jsonValue, const ECS::Entity& entity)
+	{
+		assert(jsonValue.HasMember("DummyRendererComponent") && jsonValue["DummyRendererComponent"].IsObject());
+
+		auto jsonComponentObject = jsonValue["DummyRendererComponent"].GetObject();
+		auto componentData = DummyRendererComponent();
+		ECS::Domain::SetComponent<DummyRendererComponent>(entity, componentData);
+	}
+
+	void DummyRendererComponent::JsonSerialize(rapidjson::Value& jsonValue, RapidJsonAllocator& allocator, const ECS::Entity& entity)
+	{
+		auto componentData = ECS::Domain::GetComponent<DummyRendererComponent>(entity);
+		auto jsonComponentObject = rapidjson::Value();
+		jsonComponentObject.SetObject();
+		jsonValue.AddMember("DummyRendererComponent", jsonComponentObject.GetObject(), allocator);
+	}
 }

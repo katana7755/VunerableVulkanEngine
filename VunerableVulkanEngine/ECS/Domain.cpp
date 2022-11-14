@@ -67,12 +67,9 @@ namespace ECS
 		auto newEntity = Entity::Create(identifier);
 
 		// to avoid entity duplication when it is new creation
-		if (identifier != Entity::INVALID_IDENTIFIER)
+		while (s_EntityToKeyMap.find(newEntity.m_Identifier) != s_EntityToKeyMap.end())
 		{
-			while (s_EntityToKeyMap.find(newEntity.m_Identifier) != s_EntityToKeyMap.end())
-			{
-				newEntity = Entity::Create(identifier);
-			}
+			newEntity = Entity::Create(identifier);
 		}
 
 		assert(s_EntityToKeyMap.find(newEntity.m_Identifier) == s_EntityToKeyMap.end());

@@ -4,6 +4,7 @@
 #include "VulkanGraphics.h"
 #include "../DebugUtility.h"
 #include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtx/quaternion.hpp"
 
 #ifdef _WIN32
 #include "vulkan/vulkan_win32.h" // TODO: need to consider other platfroms such as Android, Linux etc... in the future
@@ -45,6 +46,8 @@ void check_vk_result(VkResult err)
 
 	throw;
 }
+
+std::vector<glm::mat4x4> VulkanGraphics::s_DummyMVPArray;
 
 VulkanGraphics::VulkanGraphics()
 	: m_DescriptorPoolIdentifier(-1)
@@ -144,6 +147,7 @@ void VulkanGraphics::Initialize(HINSTANCE hInstance, HWND hWnd)
 
 	VulnerableLayer::Initialize();
 
+	InitializeRenderLoop();
 	BuildRenderLoop();
 	InitializeGUI();
 }
@@ -245,6 +249,7 @@ void VulkanGraphics::Invalidate()
 	m_DepthBuffer.CreateAsDepthBuffer();
 	m_MVPMatrixUniformBuffer.Create();
 
+	InitializeRenderLoop();
 	BuildRenderLoop();
 	InitializeGUI();
 }
@@ -305,7 +310,123 @@ void VulkanGraphics::PresentFrame()
 	}
 }
 
-void VulkanGraphics::BuildRenderLoop()
+void VulkanGraphics::ClearAllDummies()
+{
+	s_DummyMVPArray.clear();
+}
+
+void VulkanGraphics::AddDummy(glm::vec3 position, glm::quat rotation, glm::vec3 scale)
+{
+	uint32_t width, height, layers;
+	VulkanGraphicsResourceSwapchain::GetInstance().GetSwapchainSize(width, height);
+
+	glm::mat4x4 m = glm::translate(glm::mat4(1.0f), position) * glm::toMat4(rotation) * glm::scale(glm::mat4(1.0f), scale);
+	glm::mat4x4 v = glm::lookAt(glm::vec3(0.0f, 0.0f, 120.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::mat4x4 p = glm::perspective(glm::radians(60.0f), (float)width / height, 0.01f, 1000.0f);
+	s_DummyMVPArray.push_back(p * v * m);
+}
+
+void VulkanGraphics::RecordPrimary()
+{
+	// TODO: replace synchronous wait with double command buffers???
+	vkDeviceWaitIdle(VulkanGraphicsResourceDevice::GetInstance().GetLogicalDevice());
+
+	if (m_RenderingCommandBufferIdentifier != (size_t)-1)
+	{
+		VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::DestroyCommandBuffer>([&](auto* commandPtr) {
+			commandPtr->m_Identifier = m_RenderingCommandBufferIdentifier;
+			});
+		VulnerableLayer::ExecuteAllCommands();
+
+		m_RenderingCommandBufferIdentifier = (size_t)-1;
+	}
+
+	uint32_t width, height, layers;
+	VulkanGraphicsResourceSwapchain::GetInstance().GetSwapchainSize(width, height);
+
+	// TODO: when we have proper scene setting flow, remove this codes and replace with that...
+	glm::vec3 mainLightDirection = glm::vec3(0.0f, 0.0f, 1.0f);
+
+	if (m_RenderingCommandBufferIdentifier == (size_t)-1)
+	{
+		m_RenderingCommandBufferIdentifier = VulkanGraphicsResourceCommandBufferManager::GetInstance().AllocateIdentifier();
+
+		VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateCommandBuffer>([&](auto* commandPtr) {
+			commandPtr->m_Identifier = m_RenderingCommandBufferIdentifier;
+			commandPtr->m_InputData.m_CommandType = EVulkanCommandType::GRAPHICS;
+			commandPtr->m_InputData.m_IsTransient = false;
+			commandPtr->m_InputData.m_SortOrder = 1;
+			});
+
+		auto* recordingCommandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
+		recordingCommandPtr->m_Identifier = m_RenderingCommandBufferIdentifier;
+
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::BeginRenderPassExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
+			gfxExecutionPtr->m_RenderPassIdentifier = m_DefaultRenderPassIdentifier;
+			gfxExecutionPtr->m_FrameBufferIdentifier = m_FrontBufferIdentifierArray[0];
+			gfxExecutionPtr->m_FrameBufferColor = m_ColorBufferArray[0].GetImage();
+			gfxExecutionPtr->m_FrameBufferDepth = m_DepthBuffer.GetImage();
+			gfxExecutionPtr->m_RenderArea = { {0, 0}, {width, height} };
+			});
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::BindPipelineExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
+			gfxExecutionPtr->m_PipelineIdentifier = m_PipelineIdentifier;
+			});
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::BindDescriptorSetsExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
+			gfxExecutionPtr->m_PipelineIdentifier = m_PipelineIdentifier;
+			gfxExecutionPtr->m_DescriptorSetIdentifierArray.push_back(m_DescriptorSetIdentifier);
+			gfxExecutionPtr->m_GfxObjectUsage.m_ReadTextureArray.push_back(m_CharacterHeadTexture.GetImage());
+			gfxExecutionPtr->m_GfxObjectUsage.m_ReadTextureArray.push_back(m_CharacterBodyTexture.GetImage());
+			});
+
+		for (auto MVP : s_DummyMVPArray)
+		{
+			VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::PushConstantsExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
+				gfxExecutionPtr->m_PipelineIdentifier = m_PipelineIdentifier;
+				{
+					auto dataPtr = (uint8_t*)(&MVP);
+					size_t dataSize = sizeof(MVP);
+					gfxExecutionPtr->m_RawDataArrays[EVulkanShaderType::VERTEX].push_back(VulkanPushContstansRawData(dataPtr, dataPtr + dataSize));
+				}
+				{
+					auto dataPtr = (uint8_t*)(&mainLightDirection);
+					size_t dataSize = sizeof(mainLightDirection);
+					gfxExecutionPtr->m_RawDataArrays[EVulkanShaderType::VERTEX].push_back(VulkanPushContstansRawData(dataPtr, dataPtr + dataSize));
+				}
+				});
+			VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::DrawIndexedExectuion>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
+				gfxExecutionPtr->m_PipelineIdentifier = m_PipelineIdentifier;
+				gfxExecutionPtr->m_VertexBuffer = m_CharacterMesh.GetVertexBuffer();
+				gfxExecutionPtr->m_IndexBuffer = m_CharacterMesh.GetIndexBuffer();
+				gfxExecutionPtr->m_InstanceCount = 1;
+				gfxExecutionPtr->m_IndexCount = m_CharacterMesh.GetIndexCount();
+				gfxExecutionPtr->m_InstanceCount = 1;
+				gfxExecutionPtr->m_GfxObjectUsage.m_ReadBufferArray.push_back(m_CharacterMesh.GetVertexBuffer());
+				gfxExecutionPtr->m_GfxObjectUsage.m_ReadBufferArray.push_back(m_CharacterMesh.GetIndexBuffer());
+				});
+		}
+
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::EndRenderPassExecution>(recordingCommandPtr->m_ExecutionPtrArray, NULL);
+		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::CopyImageExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
+			gfxExecutionPtr->m_SourceImage = m_ColorBufferArray[0].GetImage();
+			gfxExecutionPtr->m_SourceLayoutFrom = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			gfxExecutionPtr->m_SourceLayoutTo = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			gfxExecutionPtr->m_SourceAccessMaskFrom = 0;
+			gfxExecutionPtr->m_SourceAccessMaskTo = 0;
+			gfxExecutionPtr->m_DestinationImage = m_ColorBufferArray[1].GetImage();
+			gfxExecutionPtr->m_DestinationLayoutFrom = VK_IMAGE_LAYOUT_UNDEFINED;
+			gfxExecutionPtr->m_DestinationLayoutTo = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			gfxExecutionPtr->m_DestinationAccessMaskFrom = 0;
+			gfxExecutionPtr->m_DestinationAccessMaskTo = VK_ACCESS_SHADER_READ_BIT;
+			gfxExecutionPtr->m_Width = width;
+			gfxExecutionPtr->m_Height = height;
+			});
+	}
+
+	// Execute body commands
+	VulnerableLayer::ExecuteAllCommands();
+}
+
+void VulkanGraphics::InitializeRenderLoop()
 {
 	m_DefaultRenderPassIdentifier = VulkanGraphicsResourceRenderPassManager::GetInstance().AllocateIdentifier();
 
@@ -360,7 +481,7 @@ void VulkanGraphics::BuildRenderLoop()
 
 		subPassDepthStencilAttachment.attachment = 1;
 		subPassDepthStencilAttachment.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-		
+
 		// subPassPreserveAttachmentArray
 		{
 			// TODO: find out when we have to use this...
@@ -441,15 +562,10 @@ void VulkanGraphics::BuildRenderLoop()
 		colorBuffer.CreateAsColorBufferForGUI();
 		m_ColorBufferArray.push_back(colorBuffer);
 	}
+}
 
-	
-	// TODO: when we have proper scene setting flow, remove this codes and replace with that...
-	glm::mat4x4 modelMatrix = glm::rotate(glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f)), glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	glm::mat4x4 viewMatrix = glm::lookAt(glm::vec3(0.0f, 0.0f, 120.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-	glm::mat4x4 pushProjectionMatrix = glm::perspective(glm::radians(60.0f), (float)width / height, 0.01f, 1000.0f);
-	glm::mat4x4 pushMVPMatrix = pushProjectionMatrix * viewMatrix * modelMatrix;
-	glm::vec3 mainLightDirection = glm::vec3(0.0f, 0.0f, 1.0f);
-
+void VulkanGraphics::BuildRenderLoop()
+{
 	VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateShader>([&](auto* commandPtr) {
 		commandPtr->m_Identifier = VulkanGraphicsResourceShaderManager::GetInstance().AllocateIdentifier();
 		commandPtr->m_UploadBufferID = VulnerableUploadBufferManager::LoadFromFile("../Shaders/Output/coloredtriangle_vert.spv");
@@ -512,79 +628,6 @@ void VulkanGraphics::BuildRenderLoop()
 		outputData.BindCombinedSampler(1, m_CharacterBodyTexture.GetImage(), m_CharacterBodyTexture.GetImageView(), m_CharacterBodySampler.GetSampler());
 		outputData.FlushBindingInfos();
 	}
-
-	if (m_RenderingCommandBufferIdentifier == (size_t)-1)
-	{
-		m_RenderingCommandBufferIdentifier = VulkanGraphicsResourceCommandBufferManager::GetInstance().AllocateIdentifier();
-
-		VulnerableLayer::AllocateCommandWithSetter<VulnerableCommand::CreateCommandBuffer>([&](auto* commandPtr) {
-			commandPtr->m_Identifier = m_RenderingCommandBufferIdentifier;
-			commandPtr->m_InputData.m_CommandType = EVulkanCommandType::GRAPHICS;
-			commandPtr->m_InputData.m_IsTransient = false;
-			commandPtr->m_InputData.m_SortOrder = 1;
-			});
-
-		auto* recordingCommandPtr = VulnerableLayer::AllocateCommand<VulnerableCommand::RecordCommandBuffer>();
-		recordingCommandPtr->m_Identifier = m_RenderingCommandBufferIdentifier;
-
-		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::BeginRenderPassExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
-			gfxExecutionPtr->m_RenderPassIdentifier = m_DefaultRenderPassIdentifier;
-			gfxExecutionPtr->m_FrameBufferIdentifier = m_FrontBufferIdentifierArray[0];
-			gfxExecutionPtr->m_FrameBufferColor = m_ColorBufferArray[0].GetImage();
-			gfxExecutionPtr->m_FrameBufferDepth = m_DepthBuffer.GetImage();
-			gfxExecutionPtr->m_RenderArea = { {0, 0}, {width, height} };
-			});
-		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::BindPipelineExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
-			gfxExecutionPtr->m_PipelineIdentifier = m_PipelineIdentifier;
-			});
-		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::PushConstantsExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
-			gfxExecutionPtr->m_PipelineIdentifier = m_PipelineIdentifier;
-			{
-				auto dataPtr = (uint8_t*)(&pushMVPMatrix);
-				size_t dataSize = sizeof(pushMVPMatrix);
-				gfxExecutionPtr->m_RawDataArrays[EVulkanShaderType::VERTEX].push_back(VulkanPushContstansRawData(dataPtr, dataPtr + dataSize));
-			}
-			{
-				auto dataPtr = (uint8_t*)(&mainLightDirection);
-				size_t dataSize = sizeof(mainLightDirection);
-				gfxExecutionPtr->m_RawDataArrays[EVulkanShaderType::VERTEX].push_back(VulkanPushContstansRawData(dataPtr, dataPtr + dataSize));
-			}
-			});
-		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::BindDescriptorSetsExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
-			gfxExecutionPtr->m_PipelineIdentifier = m_PipelineIdentifier;
-			gfxExecutionPtr->m_DescriptorSetIdentifierArray.push_back(m_DescriptorSetIdentifier);
-			gfxExecutionPtr->m_GfxObjectUsage.m_ReadTextureArray.push_back(m_CharacterHeadTexture.GetImage());
-			gfxExecutionPtr->m_GfxObjectUsage.m_ReadTextureArray.push_back(m_CharacterBodyTexture.GetImage());
-			});
-		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::DrawIndexedExectuion>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
-			gfxExecutionPtr->m_PipelineIdentifier = m_PipelineIdentifier;
-			gfxExecutionPtr->m_VertexBuffer = m_CharacterMesh.GetVertexBuffer();
-			gfxExecutionPtr->m_IndexBuffer = m_CharacterMesh.GetIndexBuffer();
-			gfxExecutionPtr->m_InstanceCount = 1;
-			gfxExecutionPtr->m_IndexCount = m_CharacterMesh.GetIndexCount();
-			gfxExecutionPtr->m_InstanceCount = 1;
-			gfxExecutionPtr->m_GfxObjectUsage.m_ReadBufferArray.push_back(m_CharacterMesh.GetVertexBuffer());
-			gfxExecutionPtr->m_GfxObjectUsage.m_ReadBufferArray.push_back(m_CharacterMesh.GetIndexBuffer());
-			});
-		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::EndRenderPassExecution>(recordingCommandPtr->m_ExecutionPtrArray, NULL);
-		VulkanGfxExecution::AllocateExecutionWithSetter<VulkanGfxExecution::CopyImageExecution>(recordingCommandPtr->m_ExecutionPtrArray, [&](auto* gfxExecutionPtr) {
-			gfxExecutionPtr->m_SourceImage = m_ColorBufferArray[0].GetImage();
-			gfxExecutionPtr->m_SourceLayoutFrom = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-			gfxExecutionPtr->m_SourceLayoutTo = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-			gfxExecutionPtr->m_SourceAccessMaskFrom = 0;
-			gfxExecutionPtr->m_SourceAccessMaskTo = 0;
-			gfxExecutionPtr->m_DestinationImage = m_ColorBufferArray[1].GetImage();
-			gfxExecutionPtr->m_DestinationLayoutFrom = VK_IMAGE_LAYOUT_UNDEFINED;
-			gfxExecutionPtr->m_DestinationLayoutTo = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			gfxExecutionPtr->m_DestinationAccessMaskFrom = 0;
-			gfxExecutionPtr->m_DestinationAccessMaskTo = VK_ACCESS_SHADER_READ_BIT;
-			gfxExecutionPtr->m_Width = width;
-			gfxExecutionPtr->m_Height = height;
-			});
-	}
-
-	// Execute body commands
-	VulnerableLayer::ExecuteAllCommands();
 }
 
 void VulkanGraphics::TransferAllStagingBuffers()

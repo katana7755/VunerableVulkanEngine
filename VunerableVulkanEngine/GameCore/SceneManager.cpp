@@ -8,6 +8,7 @@
 #include "../rapidjson/stringbuffer.h"
 #include "../rapidjson/prettywriter.h"
 #include "GameCoreComponentClasses.h"
+#include "GameCoreLoop.h"
 #include "../DebugUtility.h"
 
 namespace GameCore
@@ -28,6 +29,8 @@ namespace GameCore
 	{
 		ECS::Domain::Terminate();
 		ECS::ComponentTypeUtility::RegisterComponentType<TransformComponent>();
+		ECS::ComponentTypeUtility::RegisterComponentType<DummyRendererComponent>();
+		ECS::Domain::RegisterSystem<DrawDummyRendererSystem>(1);
 
 		return true;
 	}
@@ -43,6 +46,8 @@ namespace GameCore
 
 		ECS::Domain::Terminate();
 		ECS::ComponentTypeUtility::RegisterComponentType<TransformComponent>();
+		ECS::ComponentTypeUtility::RegisterComponentType<DummyRendererComponent>();
+		ECS::Domain::RegisterSystem<DrawDummyRendererSystem>(1);
 
 		std::string strResourcePath = ProjectManager::GetInstance().GetResourcePath(strPath);
 		std::string strJson;

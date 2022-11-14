@@ -1,4 +1,5 @@
 #include "EditorSceneBrowser.h"
+#include "EditorSelection.h"
 
 #define MENU_NAME "Scene"
 #define EDITOR_NAME "Scene Browser"
@@ -31,7 +32,7 @@ void EditorSceneBrowser::DrawWhenChecked()
     }
 
     ECS::Domain::ForEach([&](ECS::ComponentArrayChunk* chunkPtr) {
-        bool isChunkOpen = ImGui::TreeNodeEx((void*)(intptr_t)chunkIndex, IsSelectedChunk(chunkPtr->m_ComponentTypesKey) ? SELECT_BASE_FLAGS : BASE_FLAGS, chunkPtr->GetComponentsKeyAsString().c_str());
+        bool isChunkOpen = ImGui::TreeNodeEx((void*)(intptr_t)chunkIndex, EditorSelection::GetInstance().IsChunkSelected(chunkPtr->m_ComponentTypesKey) ? SELECT_BASE_FLAGS : BASE_FLAGS, chunkPtr->GetComponentsKeyAsString().c_str());
 
         if (ImGui::IsItemClicked())
         {
@@ -44,7 +45,7 @@ void EditorSceneBrowser::DrawWhenChecked()
             for (int entityIndex = 0; entityIndex < chunkPtr->m_EntityArray.size(); ++entityIndex)
             {
                 auto& entity = chunkPtr->m_EntityArray[entityIndex];
-                bool isEntityOpen = ImGui::TreeNodeEx((void*)(intptr_t)entityIndex, IsSelectedEntity(entity) ? SELECT_CHILD_FLAGS : CHILD_FLAGS, "Entity %d", entity.m_Identifier);
+                bool isEntityOpen = ImGui::TreeNodeEx((void*)(intptr_t)entityIndex, EditorSelection::GetInstance().IsEntitySelected(entity) ? SELECT_CHILD_FLAGS : CHILD_FLAGS, "Entity %d", entity.m_Identifier);
 
                 if (ImGui::IsItemClicked())
                 {
@@ -64,70 +65,6 @@ void EditorSceneBrowser::DrawWhenChecked()
         ++chunkIndex;
         });
 
-    //static bool test_drag_and_drop = false;
-    //static int selection_mask = (1 << 2);
-    //int node_clicked = -1;
-
-    //for (int i = 0; i < 6; i++)
-    //{
-    //    // Disable the default "open on single-click behavior" + set Selected flag according to our selection.
-    //    ImGuiTreeNodeFlags node_flags = base_flags;
-    //    const bool is_selected = (selection_mask & (1 << i)) != 0;
-
-    //    if (is_selected)
-    //        node_flags |= ImGuiTreeNodeFlags_Selected;
-
-    //    if (i < 3)
-    //    {
-    //        // Items 0..2 are Tree Node
-    //        bool node_open = ImGui::TreeNodeEx((void*)(intptr_t)i, node_flags, "Selectable Node %d", i);
-
-    //        if (ImGui::IsItemClicked())
-    //            node_clicked = i;
-
-    //        if (test_drag_and_drop && ImGui::BeginDragDropSource())
-    //        {
-    //            ImGui::SetDragDropPayload("_TREENODE", NULL, 0);
-    //            ImGui::Text("This is a drag and drop source");
-    //            ImGui::EndDragDropSource();
-    //        }
-
-    //        if (node_open)
-    //        {
-    //            ImGui::BulletText("Blah blah\nBlah Blah");
-    //            ImGui::TreePop();
-    //        }
-    //    }
-    //    else
-    //    {
-    //        // Items 3..5 are Tree Leaves
-    //        // The only reason we use TreeNode at all is to allow selection of the leaf. Otherwise we can
-    //        // use BulletText() or advance the cursor by GetTreeNodeToLabelSpacing() and call Text().
-    //        node_flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen; // ImGuiTreeNodeFlags_Bullet
-    //        ImGui::TreeNodeEx((void*)(intptr_t)i, node_flags, "Selectable Leaf %d", i);
-
-    //        if (ImGui::IsItemClicked())
-    //            node_clicked = i;
-
-    //        if (test_drag_and_drop && ImGui::BeginDragDropSource())
-    //        {
-    //            ImGui::SetDragDropPayload("_TREENODE", NULL, 0);
-    //            ImGui::Text("This is a drag and drop source");
-    //            ImGui::EndDragDropSource();
-    //        }
-    //    }
-    //}
-
-    //if (node_clicked != -1)
-    //{
-    //    // Update selection state
-    //    // (process outside of tree loop to avoid visual inconsistencies during the clicking frame)
-    //    if (ImGui::GetIO().KeyCtrl)
-    //        selection_mask ^= (1 << node_clicked);          // CTRL+click to toggle
-    //    else //if (!(selection_mask & (1 << node_clicked))) // Depending on selection behavior you want, may want to preserve selection when clicking on item that is part of the selection
-    //        selection_mask = (1 << node_clicked);           // Click to single-select
-    //}
-
     bool isCreateChunkOpen = false;
     bool isDestroyChunkOpen = false;
     bool isCreateEntityOpen = false;
@@ -138,17 +75,18 @@ void EditorSceneBrowser::DrawWhenChecked()
         isMouseClicked = false;
         isCreateChunkOpen = ImGui::Selectable("Create Chunk", false);
 
-        if (!m_SelectedChunkArray.empty())
+        if (EditorSelection::GetInstance().IsChunkSelectionExist())
         {
             isDestroyChunkOpen = ImGui::Selectable("Destroy Chunk", false);
+            
         }
         
-        if (!(m_SelectedChunkArray.empty() && m_SelectedEntityArray.empty()))
+        if (EditorSelection::GetInstance().IsChunkSelectionExist() || EditorSelection::GetInstance().IsEntitySelectionExist())
         {
             isCreateEntityOpen = ImGui::Selectable("Create Entity", false);
         }
         
-        if (!m_SelectedEntityArray.empty())
+        if (EditorSelection::GetInstance().IsEntitySelectionExist())
         {
             isDestroyEntityOpen = ImGui::Selectable("Destroy Entity", false);
         }
@@ -162,17 +100,17 @@ void EditorSceneBrowser::DrawWhenChecked()
     {
         if (!ImGui::GetIO().KeyCtrl)
         {
-            ClearAllSelections();
+            EditorSelection::GetInstance().UnselectAll();
         }
 
         if (existChunkCandidate)
         {
-            m_SelectedChunkArray.push_back(chunkCandidate);
+            EditorSelection::GetInstance().SelectChunk(chunkCandidate);
         }
 
         if (existEntityCandidate)
         {
-            m_SelectedEntityArray.push_back(entityCandidate);
+            EditorSelection::GetInstance().SelectEntity(entityCandidate);
         }
     }
 
@@ -247,7 +185,7 @@ void EditorSceneBrowser::CreateChunk(bool isOpen)
                 ImGui::CloseCurrentPopup();
             }
         }
-        else 
+        else
         {
             ImGui::Dummy(ImVec2(0.0f, 24.0f));
             ImGui::Spacing();
@@ -286,21 +224,28 @@ void EditorSceneBrowser::DestroyChunk(bool isOpen)
         return;
     }
 
-    for (uint32_t i = 0; i < m_SelectedChunkArray.size(); ++i)
+    auto& componentTypesKeyArray = EditorSelection::GetInstance().GetSelectedChunks();
+
+    for (auto& componentTypesKey : componentTypesKeyArray)
     {
-        ECS::Domain::DestroyChunk(m_SelectedChunkArray[i]);
+        ECS::Domain::DestroyChunk(componentTypesKey);
     }
 
-    m_SelectedChunkArray.clear();
+    EditorSelection::GetInstance().UnselectAllChunks();
 
-    for (uint32_t i = m_SelectedEntityArray.size(); i > 0; --i)
+    auto& entityArray = EditorSelection::GetInstance().GetSelectedEntities();
+    size_t lastIndex = entityArray.size() - 1;
+
+    for (size_t i = 0; i <= lastIndex; ++i)
     {
-        auto entity = m_SelectedEntityArray[i - 1];
+        auto& entity = entityArray[lastIndex - i];
 
-        if (!ECS::Domain::IsAliveEntity(entity))
+        if (ECS::Domain::IsAliveEntity(entity))
         {
-            m_SelectedEntityArray.erase(m_SelectedEntityArray.begin() + i - 1);
+            continue;
         }
+
+        EditorSelection::GetInstance().UnselectEntity(entity);
     }
 }
 
@@ -319,12 +264,16 @@ void EditorSceneBrowser::CreateEntity(bool isOpen)
         return;
     }
 
-    for (auto& componentTypesKey : m_SelectedChunkArray)
+    auto& componentTypesKeyArray = EditorSelection::GetInstance().GetSelectedChunks();
+
+    for (auto& componentTypesKey : componentTypesKeyArray)
     {
         ECS::Domain::CreateEntity(componentTypesKey);
     }
 
-    for (auto& entity : m_SelectedEntityArray)
+    auto& entityArray = EditorSelection::GetInstance().GetSelectedEntities();
+
+    for (auto& entity : entityArray)
     {
         ECS::Domain::CreateEntity(ECS::Domain::GetComponentTypesKey(entity));
     }
@@ -345,26 +294,12 @@ void EditorSceneBrowser::DestroyEntity(bool isOpen)
         return;
     }
 
-    for (auto entity : m_SelectedEntityArray)
+    auto& entityArray = EditorSelection::GetInstance().GetSelectedEntities();
+
+    for (auto& entity : entityArray)
     {
         ECS::Domain::DestroyEntity(entity);
-    }    
+    }
 
-    m_SelectedEntityArray.clear();
-}
-
-void EditorSceneBrowser::ClearAllSelections()
-{
-    m_SelectedChunkArray.clear();
-    m_SelectedEntityArray.clear();
-}
-
-bool EditorSceneBrowser::IsSelectedChunk(const ECS::ComponentTypesKey& componentTypesKey)
-{
-    return std::find(m_SelectedChunkArray.begin(), m_SelectedChunkArray.end(), componentTypesKey) != m_SelectedChunkArray.end();
-}
-
-bool EditorSceneBrowser::IsSelectedEntity(const ECS::Entity& entity)
-{
-    return std::find(m_SelectedEntityArray.begin(), m_SelectedEntityArray.end(), entity) != m_SelectedEntityArray.end();
+    EditorSelection::GetInstance().UnselectAllEntities();
 }

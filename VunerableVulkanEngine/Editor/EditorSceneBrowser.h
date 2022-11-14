@@ -14,11 +14,4 @@ private:
 	void DestroyChunk(bool isOpen);
 	void CreateEntity(bool isOpen);
 	void DestroyEntity(bool isOpen);
-	void ClearAllSelections();
-	bool IsSelectedChunk(const ECS::ComponentTypesKey& componentTypesKey);
-	bool IsSelectedEntity(const ECS::Entity& entity);
-
-private:
-	std::vector<ECS::ComponentTypesKey> m_SelectedChunkArray;
-	std::vector<ECS::Entity>			m_SelectedEntityArray;
 };

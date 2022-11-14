@@ -25,7 +25,12 @@ public:
 	void SubmitPrimary();
 	void PresentFrame();
 
+	static void ClearAllDummies();
+	static void AddDummy(glm::vec3 position, glm::quat rotation, glm::vec3 scale);
+	void RecordPrimary();
+
 private:
+	void InitializeRenderLoop();
 	void BuildRenderLoop();
 	void TransferAllStagingBuffers();
 
@@ -64,5 +69,7 @@ private:
 
 	size_t	m_ImGuiRenderPassIdentifier;
 	bool	m_ImGuiFontUpdated;
+
+	static std::vector<glm::mat4x4> s_DummyMVPArray;
 };
 

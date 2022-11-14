@@ -5,6 +5,7 @@
 #include "VunerableVulkanEngine.h"
 #include "Graphics/VulkanGraphics.h"
 #include "IMGUI/imgui_impl_win32.h"
+#include "GameCore/GameCoreLoop.h"
 #include "GameCore/ProjectManager.h"
 #include "GameCore/SceneManager.h"
 #include "Editor/EditorManager.h"
@@ -68,8 +69,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             DispatchMessage(&msg);
         }
 
+        GameCore::Loop();
+
         if (gGraphicsPtr != NULL)
         {
+            gGraphicsPtr->RecordPrimary();
             gGraphicsPtr->SubmitPrimary();
             gGraphicsPtr->PresentFrame();
         }
